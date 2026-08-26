@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zamble-scan-v1';
+const CACHE_NAME = 'zamble-scan-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -27,12 +27,18 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  // App shell : cache-first (fonctionne hors-ligne).
-  // Tout le reste (Open Library, Google Books, zamble-search-api...) : réseau direct,
-  // jamais mis en cache — les prix et fiches doivent toujours être frais.
-  if (url.origin === self.location.origin) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
-    );
-  }
+  if (url.origin !== self.location.origin) return; // API externes : jamais interceptées
+
+  // Réseau d'abord (toute mise à jour déployée doit arriver immédiatement,
+  // important tant que l'appli est en cours d'itération) ; on ne retombe sur
+  // le cache que si le réseau échoue vraiment (hors-ligne en brocante).
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
 });

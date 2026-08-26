@@ -409,7 +409,7 @@ async function startBarcodeScanner() {
 
     if ('BarcodeDetector' in window) {
       const detector = new BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'isbn', 'upc_a', 'upc_e', 'code_128']
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
       });
       scannerInterval = setInterval(async () => {
         try {
