@@ -209,6 +209,14 @@ function removeItem(id) {
   render();
 }
 
+function clearAllItems() {
+  if (items.length === 0) return;
+  if (!confirm(`Vider toute la liste ? ${items.length} objet(s) seront supprimés.`)) return;
+  items = [];
+  saveItems();
+  render();
+}
+
 function renameItem(id, newTitle) {
   const item = items.find((i) => i.id === id);
   if (!item) return;
@@ -476,6 +484,7 @@ function initUI() {
     updateBatchButtonsState();
   });
   document.getElementById('open-selected-btn').addEventListener('click', startSequentialOpen);
+  document.getElementById('clear-all-btn').addEventListener('click', clearAllItems);
 
   render();
 
