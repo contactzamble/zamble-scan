@@ -156,14 +156,14 @@ function buildVintedUrl(query) {
 // Gestion des objets
 // ---------------------------------------------------------------------------
 
-function addItem(type, code) {
+function createAndQueueItem({ type, code, title, cover }) {
   const item = {
     id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
     type,
     code,
-    title: code,
+    title,
     author: null,
-    cover: null,
+    cover: cover || null,
     priceStatus: null,
     ebayPrice: null,
     ebayUrl: null,
@@ -172,6 +172,11 @@ function addItem(type, code) {
   items.unshift(item);
   saveItems();
   render();
+  return item;
+}
+
+function addItem(type, code) {
+  const item = createAndQueueItem({ type, code, title: code });
 
   if (type === 'livre') {
     identifyBook(item);
@@ -445,27 +450,203 @@ function stopBarcodeScanner() {
 }
 
 // ---------------------------------------------------------------------------
+// Reconnaissance par photo de couverture — capture auto sur image stable
+// ---------------------------------------------------------------------------
+
+const DIFF_W = 48, DIFF_H = 36;
+const STILL_THRESHOLD = 8;             // diff moyenne par pixel (canal rouge) en dessous = "stable"
+const MOVEMENT_RESET_THRESHOLD = 20;   // diff au dessus = "a bougé", réarme la détection
+const STILL_DURATION_MS = 1000;
+const MIN_COOLDOWN_MS = 3000;
+// Valeurs de départ à ajuster après premier test réel sur téléphone (comme
+// pour les formats BarcodeDetector) — trop sensible = capture prématurée,
+// pas assez = ne se déclenche jamais.
+
+let photoStream = null;
+let photoRaf = null;
+let prevFrame = null;
+let stableSinceTs = null;
+let armed = true;
+let capturing = false;
+let lastCaptureTs = 0;
+
+async function startPhotoScanner() {
+  const wrap = document.getElementById('photo-scanner-wrap');
+  const video = document.getElementById('photo-scanner-video');
+  const status = document.getElementById('photo-scanner-status');
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showToast('Caméra non disponible sur cet appareil.', true);
+    return;
+  }
+
+  try {
+    photoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = photoStream;
+    wrap.style.display = 'flex';
+    status.textContent = 'Visez la couverture et tenez immobile...';
+    document.getElementById('vision-result-banner').style.display = 'none';
+
+    prevFrame = null;
+    stableSinceTs = null;
+    armed = true;
+    capturing = false;
+    lastCaptureTs = 0;
+
+    photoRaf = requestAnimationFrame(diffLoop);
+  } catch (err) {
+    const detail = err && (err.name || err.message) ? `${err.name || ''} ${err.message || ''}`.trim() : 'erreur inconnue';
+    showToast(`Caméra inaccessible : ${detail}`, true);
+    console.error('startPhotoScanner:', err);
+    wrap.style.display = 'none';
+  }
+}
+
+function diffLoop() {
+  if (!photoStream) return; // scanner fermé entre-temps
+
+  const video = document.getElementById('photo-scanner-video');
+  const diffCanvas = document.getElementById('diff-canvas');
+  const ctx = diffCanvas.getContext('2d', { willReadFrequently: true });
+
+  if (video.readyState >= 2) {
+    ctx.drawImage(video, 0, 0, DIFF_W, DIFF_H);
+    const frame = ctx.getImageData(0, 0, DIFF_W, DIFF_H).data;
+
+    if (prevFrame && !capturing) {
+      let sum = 0;
+      for (let i = 0; i < frame.length; i += 4) sum += Math.abs(frame[i] - prevFrame[i]);
+      const avgDiff = sum / (frame.length / 4);
+
+      if (!armed) {
+        if (avgDiff > MOVEMENT_RESET_THRESHOLD) { armed = true; stableSinceTs = null; }
+      } else if (avgDiff < STILL_THRESHOLD) {
+        const now = Date.now();
+        if (stableSinceTs === null) stableSinceTs = now;
+        if (now - stableSinceTs >= STILL_DURATION_MS && now - lastCaptureTs >= MIN_COOLDOWN_MS) {
+          triggerCapture();
+        }
+      } else {
+        stableSinceTs = null;
+      }
+    }
+    prevFrame = frame;
+  }
+
+  photoRaf = requestAnimationFrame(diffLoop);
+}
+
+async function triggerCapture() {
+  capturing = true;
+  armed = false;
+  lastCaptureTs = Date.now();
+  const status = document.getElementById('photo-scanner-status');
+  status.textContent = 'Photo prise, analyse en cours... 🔎';
+
+  const video = document.getElementById('photo-scanner-video');
+  const captureCanvas = document.getElementById('capture-canvas');
+  const maxDim = 900;
+  const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+  captureCanvas.width = Math.round(video.videoWidth * scale);
+  captureCanvas.height = Math.round(video.videoHeight * scale);
+  captureCanvas.getContext('2d').drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+
+  const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.7);
+  const base64 = dataUrl.split(',')[1];
+
+  try {
+    const r = await fetch(`${SEARCH_API_URL}/vision-search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await r.json();
+
+    if (r.status === 429) {
+      showToast(data.message || 'Quota mensuel de reconnaissance photo atteint.', true);
+      stopPhotoScanner();
+      return;
+    }
+    if (!r.ok) throw new Error(data.error || `statut ${r.status}`);
+
+    showVisionResult(data.label, data.thumbnailUrl);
+  } catch (err) {
+    showToast('Reconnaissance impossible : ' + (err?.message || 'erreur réseau') + ' — nouvelle tentative possible.', true);
+    capturing = false;
+    status.textContent = 'Visez la couverture et tenez immobile...';
+  }
+}
+
+function showVisionResult(label, thumbnailUrl) {
+  const status = document.getElementById('photo-scanner-status');
+  status.textContent = '';
+
+  const banner = document.getElementById('vision-result-banner');
+  banner.innerHTML = '';
+  banner.style.display = 'flex';
+
+  const text = document.createElement('div');
+  text.className = 'vision-result-label';
+  text.textContent = label || 'Objet non identifié';
+  banner.appendChild(text);
+
+  const actions = document.createElement('div');
+  actions.className = 'vision-result-actions';
+
+  actions.appendChild(makeLinkBtn('Google', buildGoogleUrl(label || '')));
+
+  const addBtn = document.createElement('button');
+  addBtn.textContent = '+ Ajouter à la liste';
+  addBtn.addEventListener('click', () => {
+    addItemFromVision(label, thumbnailUrl);
+    resumePhotoScanner();
+  });
+  actions.appendChild(addBtn);
+
+  const retryBtn = document.createElement('button');
+  retryBtn.textContent = '↻ Reprendre';
+  retryBtn.addEventListener('click', resumePhotoScanner);
+  actions.appendChild(retryBtn);
+
+  banner.appendChild(actions);
+}
+
+function resumePhotoScanner() {
+  document.getElementById('vision-result-banner').style.display = 'none';
+  document.getElementById('photo-scanner-status').textContent = 'Visez la couverture et tenez immobile...';
+  capturing = false;
+  // Le réarmement exige toujours un mouvement net (armed reste false jusqu'à
+  // un vrai déplacement) — évite de recapturer instantanément le même objet.
+}
+
+function stopPhotoScanner() {
+  if (photoStream) { photoStream.getTracks().forEach((t) => t.stop()); photoStream = null; }
+  if (photoRaf) { cancelAnimationFrame(photoRaf); photoRaf = null; }
+  document.getElementById('photo-scanner-wrap').style.display = 'none';
+}
+
+// ---------------------------------------------------------------------------
 // Ajout manuel (sans scanner)
 // ---------------------------------------------------------------------------
 
 function manualAdd() {
   const title = prompt(currentType === 'livre' ? 'Titre du livre :' : 'Titre du jeu :');
   if (!title || !title.trim()) return;
-  const item = {
-    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+  const item = createAndQueueItem({ type: currentType, code: '(saisie manuelle)', title: title.trim() });
+  enrichEbayPrice(item);
+}
+
+function addItemFromVision(label, thumbnailUrl) {
+  const item = createAndQueueItem({
     type: currentType,
-    code: '(saisie manuelle)',
-    title: title.trim(),
-    author: null,
-    cover: null,
-    priceStatus: null,
-    ebayPrice: null,
-    ebayUrl: null,
-    createdAt: Date.now()
-  };
-  items.unshift(item);
-  saveItems();
-  render();
+    code: '(reconnaissance photo)',
+    title: label || '(objet photographié — à renommer)',
+    cover: thumbnailUrl
+  });
+  showToast(label ? `Ajouté : ${label} 📷` : 'Ajouté — renommez le titre 📷');
   enrichEbayPrice(item);
 }
 
@@ -478,6 +659,8 @@ function initUI() {
   document.getElementById('type-jeu').addEventListener('click', () => setType('jeu'));
   document.getElementById('scan-btn').addEventListener('click', startBarcodeScanner);
   document.getElementById('scanner-close-btn').addEventListener('click', stopBarcodeScanner);
+  document.getElementById('photo-scan-btn').addEventListener('click', startPhotoScanner);
+  document.getElementById('photo-scanner-close-btn').addEventListener('click', stopPhotoScanner);
   document.getElementById('manual-add-btn').addEventListener('click', manualAdd);
 
   document.getElementById('select-all').addEventListener('change', (e) => {

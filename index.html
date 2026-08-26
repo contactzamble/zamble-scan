@@ -24,6 +24,7 @@
       <button type="button" id="type-jeu" class="type-btn" data-type="jeu">🎲 Jeu</button>
     </div>
     <button type="button" id="scan-btn" class="scan-btn">📷 Scanner un code-barre</button>
+    <button type="button" id="photo-scan-btn" class="scan-btn">🖼️ Identifier par photo</button>
     <button type="button" id="manual-add-btn" class="manual-btn">+ Ajouter sans scanner</button>
   </section>
 
@@ -31,6 +32,15 @@
     <video id="scanner-video" autoplay playsinline muted></video>
     <p id="scanner-status" class="scanner-status">Pointez vers le code-barre...</p>
     <button type="button" id="scanner-close-btn" class="scanner-close-btn">✕ Fermer</button>
+  </div>
+
+  <div id="photo-scanner-wrap" class="scanner-wrap" style="display:none;">
+    <video id="photo-scanner-video" autoplay playsinline muted></video>
+    <canvas id="diff-canvas" width="48" height="36" style="display:none;"></canvas>
+    <canvas id="capture-canvas" style="display:none;"></canvas>
+    <p id="photo-scanner-status" class="scanner-status">Visez la couverture et tenez immobile...</p>
+    <div id="vision-result-banner" class="vision-result-banner" style="display:none;"></div>
+    <button type="button" id="photo-scanner-close-btn" class="scanner-close-btn">✕ Fermer</button>
   </div>
 
   <section class="list-actions">
