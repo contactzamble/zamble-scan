@@ -166,6 +166,10 @@ function buildAmazonUrl(query) {
 function buildVintedUrl(query) {
   return `https://www.vinted.fr/catalog?search_text=${encodeURIComponent(query)}`;
 }
+function buildEtsyUrl(query) {
+  // Recherche simple, sans tag d'affiliation (pas de compte Etsy/Awin configuré).
+  return `https://www.etsy.com/fr/search?q=${encodeURIComponent(query)}`;
+}
 
 // Recherches Google orientées par mot-clé — évite d'avoir besoin d'identifier
 // précisément l'objet : Google fait le travail à partir du code brut ou du
@@ -325,6 +329,7 @@ function render() {
     links.appendChild(makeLinkBtn('Google', buildGoogleUrl(item.title)));
     links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(item.title)));
     links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(item.title)));
+    links.appendChild(makeLinkBtn('Etsy', buildEtsyUrl(item.title)));
     if (item.ebayUrl) links.appendChild(makeLinkBtn('eBay', item.ebayUrl));
     body.appendChild(links);
 
