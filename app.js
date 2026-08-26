@@ -313,30 +313,16 @@ function getSelectedIds() {
 function updateBatchButtonsState() {
   const n = getSelectedIds().length;
   document.getElementById('open-selected-btn').disabled = n === 0;
-  document.getElementById('open-one-by-one-btn').disabled = n === 0;
   const selectAll = document.getElementById('select-all');
   selectAll.checked = n > 0 && n === items.length;
 }
 
 // ---------------------------------------------------------------------------
-// Ouverture groupée des liens (Google, lien principal de chaque objet)
+// Ouverture des liens sélectionnés (Google, lien principal de chaque objet)
 // ---------------------------------------------------------------------------
-
-function openSelectedAtOnce() {
-  const ids = getSelectedIds();
-  let blocked = 0;
-  ids.forEach((id, i) => {
-    const item = items.find((it) => it.id === id);
-    if (!item) return;
-    setTimeout(() => {
-      const w = window.open(buildGoogleUrl(item.title), '_blank');
-      if (!w) blocked++;
-      if (i === ids.length - 1 && blocked > 0) {
-        showToast(`${blocked} onglet(s) bloqué(s) par le navigateur — utilisez "Ouvrir un par un".`, true);
-      }
-    }, i * 120);
-  });
-}
+// Les navigateurs mobiles bloquent l'ouverture de plusieurs onglets à la fois
+// depuis un seul geste (confirmé sur téléphone réel) — un seul flux séquentiel
+// ("ouvrir le suivant", un tap par objet) plutôt que deux modes dont un cassé.
 
 function startSequentialOpen() {
   const ids = getSelectedIds();
@@ -498,8 +484,7 @@ function initUI() {
     document.querySelectorAll('.item-select').forEach((c) => { c.checked = e.target.checked; });
     updateBatchButtonsState();
   });
-  document.getElementById('open-selected-btn').addEventListener('click', openSelectedAtOnce);
-  document.getElementById('open-one-by-one-btn').addEventListener('click', startSequentialOpen);
+  document.getElementById('open-selected-btn').addEventListener('click', startSequentialOpen);
 
   render();
 
