@@ -7,21 +7,23 @@ const SEARCH_API_URL = 'https://zamble-search-api.zamble.workers.dev';
 
 const STORAGE_KEY = 'zamble-scan-items';
 
+// Identifiants d'affiliation déjà actifs (mêmes comptes que zamble-comparatifs) —
+// ce ne sont pas des secrets, un tag affilié est public par nature dans un lien.
+const AMAZON_ASSOCIATE_TAG = 'bonsplanszamble-21';
+
 // ---------------------------------------------------------------------------
 // État
 // ---------------------------------------------------------------------------
 
 let items = loadItems();
-// currentType sert de filtre d'affichage (onglets "Livres"/"Jeux") ET de type
-// assigné aux ajouts manuels (le scan code-barre, lui, détecte le type tout
-// seul — voir detectTypeFromCode — donc n'en dépend plus).
-let currentType = 'livre';
 let sequentialQueue = null; // { ids: [...], index: 0 } quand le mode "un par un" est actif
 
 function detectTypeFromCode(code) {
   // Les ISBN (livres) sont des EAN-13 avec le préfixe Bookland 978/979 —
-  // règle fiable, aucun jeu de société/carte n'utilise ce préfixe.
-  return code.startsWith('978') || code.startsWith('979') ? 'livre' : 'jeu';
+  // règle fiable, aucun jeu/objet ne l'utilise. Sert uniquement à décider si
+  // on tente l'auto-remplissage via Open Library/Google Books en arrière-plan,
+  // l'appli n'a plus de filtre livre/jeu visible (généraliste depuis peu).
+  return code.startsWith('978') || code.startsWith('979') ? 'livre' : 'objet';
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +133,9 @@ async function enrichEbayPrice(item) {
       const cheapest = ebayResults.reduce((a, b) => (a.price < b.price ? a : b));
       item.priceStatus = 'found';
       item.ebayPrice = cheapest.price;
-      item.ebayUrl = cheapest.url;
+      // affiliateUrl (déjà tagué avec le Campaign ID EPN côté Worker) plutôt
+      // que url brute — rémunéré, sans rien à reconfigurer.
+      item.ebayUrl = cheapest.affiliateUrl || cheapest.url;
     } else {
       item.priceStatus = 'none';
     }
@@ -155,10 +159,27 @@ function buildGoogleUrl(query) {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 function buildAmazonUrl(query) {
-  return `https://www.amazon.fr/s?k=${encodeURIComponent(query)}`;
+  // Tag affilié valable aussi sur une recherche (pas besoin d'un ASIN précis) —
+  // rémunéré si un achat suit dans la fenêtre de cookie Amazon.
+  return `https://www.amazon.fr/s?k=${encodeURIComponent(query)}&tag=${AMAZON_ASSOCIATE_TAG}`;
 }
 function buildVintedUrl(query) {
   return `https://www.vinted.fr/catalog?search_text=${encodeURIComponent(query)}`;
+}
+
+// Recherches Google orientées par mot-clé — évite d'avoir besoin d'identifier
+// précisément l'objet : Google fait le travail à partir du code brut ou du
+// titre déjà connu.
+const SEARCH_FILTERS = [
+  { label: 'Prix neuf', suffix: 'prix neuf' },
+  { label: 'Prix occasion', suffix: 'prix occasion' },
+  { label: 'Avis', suffix: 'avis test' },
+  { label: 'Comparatif', suffix: 'comparatif' },
+  { label: 'Notice', suffix: 'notice manuel pdf' }
+];
+
+function buildFilteredSearchUrl(query, suffix) {
+  return buildGoogleUrl(`${query} ${suffix}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +211,8 @@ function addItem(type, code) {
   if (type === 'livre') {
     identifyBook(item);
   } else {
-    showToast('Code enregistré — renommez le titre du jeu 🎲');
+    showToast('Code enregistré — renommez le titre si besoin 📦');
+    enrichEbayPrice(item);
   }
 }
 
@@ -219,13 +241,9 @@ function removeItem(id) {
 }
 
 function clearAllItems() {
-  // Ne vide que la catégorie actuellement affichée (le bouton est à côté du
-  // filtre) — évite de supprimer l'autre catégorie sans qu'elle soit visible.
-  const label = currentType === 'livre' ? 'les livres' : 'les jeux';
-  const count = items.filter((i) => i.type === currentType).length;
-  if (count === 0) return;
-  if (!confirm(`Vider ${label} affichés ? ${count} objet(s) seront supprimés.`)) return;
-  items = items.filter((i) => i.type !== currentType);
+  if (items.length === 0) return;
+  if (!confirm(`Vider toute la liste ? ${items.length} objet(s) seront supprimés.`)) return;
+  items = [];
   saveItems();
   render();
 }
@@ -249,16 +267,12 @@ function render() {
   const list = document.getElementById('item-list');
   const empty = document.getElementById('empty-state');
   const countBadge = document.getElementById('item-count');
-  const filteredItems = items.filter((i) => i.type === currentType);
 
-  countBadge.textContent = filteredItems.length;
-  empty.textContent = currentType === 'livre'
-    ? 'Aucun livre scanné pour l\'instant — scannez un livre pour commencer.'
-    : 'Aucun jeu scanné pour l\'instant — scannez un jeu pour commencer.';
-  empty.style.display = filteredItems.length === 0 ? 'block' : 'none';
+  countBadge.textContent = items.length;
+  empty.style.display = items.length === 0 ? 'block' : 'none';
 
   list.innerHTML = '';
-  for (const item of filteredItems) {
+  for (const item of items) {
     const li = document.createElement('li');
     li.className = 'item-row';
 
@@ -289,7 +303,7 @@ function render() {
 
     const meta = document.createElement('div');
     meta.className = 'item-meta';
-    meta.textContent = (item.type === 'livre' ? '📚' : '🎲') +
+    meta.textContent = (item.type === 'livre' ? '📚' : '📦') +
       (item.author ? ` ${item.author}` : '') + ` · ${item.code}`;
     body.appendChild(meta);
 
@@ -313,6 +327,13 @@ function render() {
     links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(item.title)));
     if (item.ebayUrl) links.appendChild(makeLinkBtn('eBay', item.ebayUrl));
     body.appendChild(links);
+
+    const filterLinks = document.createElement('div');
+    filterLinks.className = 'item-links item-filter-links';
+    for (const f of SEARCH_FILTERS) {
+      filterLinks.appendChild(makeLinkBtn(f.label, buildFilteredSearchUrl(item.title, f.suffix)));
+    }
+    body.appendChild(filterLinks);
 
     li.appendChild(body);
 
@@ -343,10 +364,9 @@ function getSelectedIds() {
 
 function updateBatchButtonsState() {
   const n = getSelectedIds().length;
-  const visibleCount = items.filter((i) => i.type === currentType).length;
   document.getElementById('open-selected-btn').disabled = n === 0;
   const selectAll = document.getElementById('select-all');
-  selectAll.checked = n > 0 && n === visibleCount;
+  selectAll.checked = n > 0 && n === items.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -481,9 +501,9 @@ function stopBarcodeScanner() {
 // ---------------------------------------------------------------------------
 
 function manualAdd() {
-  const title = prompt(currentType === 'livre' ? 'Titre du livre :' : 'Titre du jeu :');
+  const title = prompt('Titre ou description de l\'objet :');
   if (!title || !title.trim()) return;
-  const item = createAndQueueItem({ type: currentType, code: '(saisie manuelle)', title: title.trim() });
+  const item = createAndQueueItem({ type: 'objet', code: '(saisie manuelle)', title: title.trim() });
   enrichEbayPrice(item);
 }
 
@@ -492,8 +512,6 @@ function manualAdd() {
 // ---------------------------------------------------------------------------
 
 function initUI() {
-  document.getElementById('type-livre').addEventListener('click', () => setType('livre'));
-  document.getElementById('type-jeu').addEventListener('click', () => setType('jeu'));
   document.getElementById('scan-btn').addEventListener('click', startBarcodeScanner);
   document.getElementById('scanner-close-btn').addEventListener('click', stopBarcodeScanner);
   document.getElementById('manual-add-btn').addEventListener('click', manualAdd);
@@ -510,15 +528,6 @@ function initUI() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
-}
-
-function setType(type) {
-  currentType = type;
-  document.getElementById('type-livre').classList.toggle('active', type === 'livre');
-  document.getElementById('type-jeu').classList.toggle('active', type === 'jeu');
-  document.getElementById('manual-add-btn').textContent =
-    type === 'livre' ? '+ Ajouter un livre sans scanner' : '+ Ajouter un jeu sans scanner';
-  render();
 }
 
 document.addEventListener('DOMContentLoaded', initUI);
