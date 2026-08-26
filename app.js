@@ -47,7 +47,9 @@ function showToast(msg, isError) {
   el.classList.toggle('error', !!isError);
   el.style.display = 'block';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3200);
+  // Les erreurs restent affichées plus longtemps (besoin de pouvoir les lire/relayer),
+  // les messages de confirmation classiques restent brefs.
+  toastTimer = setTimeout(() => { el.style.display = 'none'; }, isError ? 9000 : 3200);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,10 +429,18 @@ async function startBarcodeScanner() {
         });
         window._zxingReader = codeReader;
       };
+      script.onerror = () => {
+        showToast('Le scanner de secours (ZXing) n\'a pas pu être chargé — vérifiez la connexion.', true);
+      };
       document.head.appendChild(script);
     }
-  } catch {
-    showToast("Impossible d'accéder à la caméra. Vérifiez les permissions du navigateur.", true);
+  } catch (err) {
+    // On affiche le nom/message réel de l'erreur (ex. NotAllowedError,
+    // NotReadableError, NotFoundError) plutôt qu'un message générique — sinon
+    // impossible de distinguer un refus de permission d'un problème matériel.
+    const detail = err && (err.name || err.message) ? `${err.name || ''} ${err.message || ''}`.trim() : 'erreur inconnue';
+    showToast(`Caméra inaccessible : ${detail}`, true);
+    console.error('startBarcodeScanner:', err);
     wrap.style.display = 'none';
   }
 }
