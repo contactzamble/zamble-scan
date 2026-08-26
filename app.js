@@ -12,8 +12,17 @@ const STORAGE_KEY = 'zamble-scan-items';
 // ---------------------------------------------------------------------------
 
 let items = loadItems();
+// currentType sert de filtre d'affichage (onglets "Livres"/"Jeux") ET de type
+// assigné aux ajouts manuels (le scan code-barre, lui, détecte le type tout
+// seul — voir detectTypeFromCode — donc n'en dépend plus).
 let currentType = 'livre';
 let sequentialQueue = null; // { ids: [...], index: 0 } quand le mode "un par un" est actif
+
+function detectTypeFromCode(code) {
+  // Les ISBN (livres) sont des EAN-13 avec le préfixe Bookland 978/979 —
+  // règle fiable, aucun jeu de société/carte n'utilise ce préfixe.
+  return code.startsWith('978') || code.startsWith('979') ? 'livre' : 'jeu';
+}
 
 // ---------------------------------------------------------------------------
 // Persistance locale
@@ -210,9 +219,13 @@ function removeItem(id) {
 }
 
 function clearAllItems() {
-  if (items.length === 0) return;
-  if (!confirm(`Vider toute la liste ? ${items.length} objet(s) seront supprimés.`)) return;
-  items = [];
+  // Ne vide que la catégorie actuellement affichée (le bouton est à côté du
+  // filtre) — évite de supprimer l'autre catégorie sans qu'elle soit visible.
+  const label = currentType === 'livre' ? 'les livres' : 'les jeux';
+  const count = items.filter((i) => i.type === currentType).length;
+  if (count === 0) return;
+  if (!confirm(`Vider ${label} affichés ? ${count} objet(s) seront supprimés.`)) return;
+  items = items.filter((i) => i.type !== currentType);
   saveItems();
   render();
 }
@@ -236,11 +249,16 @@ function render() {
   const list = document.getElementById('item-list');
   const empty = document.getElementById('empty-state');
   const countBadge = document.getElementById('item-count');
-  countBadge.textContent = items.length;
-  empty.style.display = items.length === 0 ? 'block' : 'none';
+  const filteredItems = items.filter((i) => i.type === currentType);
+
+  countBadge.textContent = filteredItems.length;
+  empty.textContent = currentType === 'livre'
+    ? 'Aucun livre scanné pour l\'instant — scannez un livre pour commencer.'
+    : 'Aucun jeu scanné pour l\'instant — scannez un jeu pour commencer.';
+  empty.style.display = filteredItems.length === 0 ? 'block' : 'none';
 
   list.innerHTML = '';
-  for (const item of items) {
+  for (const item of filteredItems) {
     const li = document.createElement('li');
     li.className = 'item-row';
 
@@ -325,9 +343,10 @@ function getSelectedIds() {
 
 function updateBatchButtonsState() {
   const n = getSelectedIds().length;
+  const visibleCount = items.filter((i) => i.type === currentType).length;
   document.getElementById('open-selected-btn').disabled = n === 0;
   const selectAll = document.getElementById('select-all');
-  selectAll.checked = n > 0 && n === items.length;
+  selectAll.checked = n > 0 && n === visibleCount;
 }
 
 // ---------------------------------------------------------------------------
@@ -447,7 +466,7 @@ async function startBarcodeScanner() {
 function onBarcodeDetected(code) {
   stopBarcodeScanner();
   showToast('Code détecté : ' + code + ' ✨');
-  addItem(currentType, code);
+  addItem(detectTypeFromCode(code), code);
 }
 
 function stopBarcodeScanner() {
@@ -497,6 +516,9 @@ function setType(type) {
   currentType = type;
   document.getElementById('type-livre').classList.toggle('active', type === 'livre');
   document.getElementById('type-jeu').classList.toggle('active', type === 'jeu');
+  document.getElementById('manual-add-btn').textContent =
+    type === 'livre' ? '+ Ajouter un livre sans scanner' : '+ Ajouter un jeu sans scanner';
+  render();
 }
 
 document.addEventListener('DOMContentLoaded', initUI);
