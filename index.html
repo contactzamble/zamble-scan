@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zamble Scan</title>
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Zamble Scan</h1>
+  <span id="item-count" class="count-badge">0</span>
+</header>
+
+<main>
+  <section class="scan-panel">
+    <div class="type-toggle" role="group" aria-label="Type d'objet">
+      <button type="button" id="type-livre" class="type-btn active" data-type="livre">📚 Livre</button>
+      <button type="button" id="type-jeu" class="type-btn" data-type="jeu">🎲 Jeu</button>
+    </div>
+    <button type="button" id="scan-btn" class="scan-btn">📷 Scanner un code-barre</button>
+    <button type="button" id="manual-add-btn" class="manual-btn">+ Ajouter sans scanner</button>
+  </section>
+
+  <div id="scanner-wrap" class="scanner-wrap" style="display:none;">
+    <video id="scanner-video" autoplay playsinline muted></video>
+    <p id="scanner-status" class="scanner-status">Pointez vers le code-barre...</p>
+    <button type="button" id="scanner-close-btn" class="scanner-close-btn">✕ Fermer</button>
+  </div>
+
+  <section class="list-actions">
+    <label class="select-all-label">
+      <input type="checkbox" id="select-all"> Tout sélectionner
+    </label>
+    <div class="batch-buttons">
+      <button type="button" id="open-selected-btn" disabled>Ouvrir la sélection</button>
+      <button type="button" id="open-one-by-one-btn" disabled>Ouvrir un par un</button>
+    </div>
+  </section>
+
+  <p id="sequential-status" class="sequential-status" style="display:none;"></p>
+
+  <ul id="item-list" class="item-list"></ul>
+
+  <p id="empty-state" class="empty-state">Aucun objet scanné pour l'instant — scannez un livre ou un jeu pour commencer.</p>
+</main>
+
+<div id="toast" class="toast" style="display:none;"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
