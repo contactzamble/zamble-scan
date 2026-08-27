@@ -26,6 +26,13 @@ function detectTypeFromCode(code) {
   return code.startsWith('978') || code.startsWith('979') ? 'livre' : 'objet';
 }
 
+function isUrl(code) {
+  // Un QR code encode le plus souvent une URL plutôt qu'un identifiant produit
+  // lisible — sert à distinguer ce cas pour proposer un lien direct et inviter
+  // à renommer le titre (chercher l'URL brute sur Google ne donne rien d'utile).
+  return /^https?:\/\//i.test(code);
+}
+
 // ---------------------------------------------------------------------------
 // Persistance locale
 // ---------------------------------------------------------------------------
@@ -214,6 +221,9 @@ function addItem(type, code) {
 
   if (type === 'livre') {
     identifyBook(item);
+  } else if (isUrl(code)) {
+    showToast('QR code détecté — renommez le titre pour que les recherches fonctionnent 🔗');
+    enrichEbayPrice(item);
   } else {
     showToast('Code enregistré — renommez le titre si besoin 📦');
     enrichEbayPrice(item);
@@ -326,6 +336,9 @@ function render() {
 
     const links = document.createElement('div');
     links.className = 'item-links';
+    // Lien direct en premier si le code scanné est une URL (QR code) — la
+    // source la plus fiable, avant les recherches génériques par titre.
+    if (isUrl(item.code)) links.appendChild(makeLinkBtn('🔗 Page produit', item.code));
     links.appendChild(makeLinkBtn('Google', buildGoogleUrl(item.title)));
     links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(item.title)));
     links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(item.title)));
