@@ -468,6 +468,27 @@ let scannerStream = null;
 let scannerInterval = null;
 
 async function startBarcodeScanner() {
+  return openScanner({
+    formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'],
+    statusText: 'Pointez vers le code-barre...',
+    makeZxingReader: () => new ZXing.BrowserMultiFormatReader()
+  });
+}
+
+async function startQrScanner() {
+  return openScanner({
+    formats: ['qr_code'],
+    statusText: 'Pointez vers le QR code...',
+    makeZxingReader: () => new ZXing.BrowserQRCodeReader()
+  });
+}
+
+// Un détecteur natif dédié par bouton (jamais code-barre + QR dans la même
+// instance BarcodeDetector) : sur Android, les mélanger a déjà cassé TOUTE
+// la détection le temps qu'un module Play Services (ML Kit) supplémentaire
+// se charge pour le format QR — même les codes-barres classiques ne
+// remontaient plus. Séparer les deux isole le risque au bouton QR seul.
+async function openScanner({ formats, statusText, makeZxingReader }) {
   const wrap = document.getElementById('scanner-wrap');
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
@@ -483,16 +504,10 @@ async function startBarcodeScanner() {
     });
     video.srcObject = scannerStream;
     wrap.style.display = 'flex';
-    status.textContent = 'Pointez vers le code-barre...';
+    status.textContent = statusText;
 
     if ('BarcodeDetector' in window) {
-      const detector = new BarcodeDetector({
-        // qr_code retiré : sur Android, l'ajouter déclenche le téléchargement
-        // d'un module Play Services (ML Kit) supplémentaire, et tant qu'il
-        // n'est pas prêt TOUTE la détection reste vide (confirmé en test réel
-        // — même les codes-barres classiques ne remontaient plus).
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
-      });
+      const detector = new BarcodeDetector({ formats });
       scannerInterval = setInterval(async () => {
         try {
           const barcodes = await detector.detect(video);
@@ -504,8 +519,8 @@ async function startBarcodeScanner() {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js';
       script.onload = () => {
-        status.textContent = 'Pointez vers le code-barre...';
-        const codeReader = new ZXing.BrowserMultiFormatReader();
+        status.textContent = statusText;
+        const codeReader = makeZxingReader();
         codeReader.decodeFromVideoElement(video, (result) => {
           if (result) onBarcodeDetected(result.getText());
         });
@@ -522,7 +537,7 @@ async function startBarcodeScanner() {
     // impossible de distinguer un refus de permission d'un problème matériel.
     const detail = err && (err.name || err.message) ? `${err.name || ''} ${err.message || ''}`.trim() : 'erreur inconnue';
     showToast(`Caméra inaccessible : ${detail}`, true);
-    console.error('startBarcodeScanner:', err);
+    console.error('openScanner:', err);
     wrap.style.display = 'none';
   }
 }
@@ -557,6 +572,7 @@ function manualAdd() {
 
 function initUI() {
   document.getElementById('scan-btn').addEventListener('click', startBarcodeScanner);
+  document.getElementById('qr-scan-btn').addEventListener('click', startQrScanner);
   document.getElementById('scanner-close-btn').addEventListener('click', stopBarcodeScanner);
   document.getElementById('manual-add-btn').addEventListener('click', manualAdd);
 
