@@ -426,16 +426,25 @@ function updateSequentialUI() {
 }
 
 // ---------------------------------------------------------------------------
-// Scanner code-barre — repris de l'ancien zamble.fr
+// Scanner — code-barre (repris de l'ancien zamble.fr) + mode texte (OCR)
 // ---------------------------------------------------------------------------
 
 let scannerStream = null;
 let scannerInterval = null;
 
 async function startBarcodeScanner() {
+  return openScanner('barcode');
+}
+
+async function startOcrScanner() {
+  return openScanner('ocr');
+}
+
+async function openScanner(mode) {
   const wrap = document.getElementById('scanner-wrap');
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
+  const captureBtn = document.getElementById('ocr-capture-btn');
 
   if (!navigator.mediaDevices?.getUserMedia) {
     showToast('Caméra non disponible sur cet appareil.', true);
@@ -448,6 +457,17 @@ async function startBarcodeScanner() {
     });
     video.srcObject = scannerStream;
     wrap.style.display = 'flex';
+
+    if (mode === 'ocr') {
+      // Pas de détection continue ici : on laisse l'utilisateur cadrer et
+      // déclencher la capture lui-même (l'OCR est trop lent pour tourner en
+      // boucle sur chaque frame comme le scan de code-barre).
+      status.textContent = 'Cadrez le titre/texte à lire, puis capturez.';
+      captureBtn.style.display = 'inline-block';
+      return;
+    }
+
+    captureBtn.style.display = 'none';
     status.textContent = 'Pointez vers le code-barre...';
 
     if ('BarcodeDetector' in window) {
@@ -499,6 +519,63 @@ function stopBarcodeScanner() {
   if (scannerInterval) { clearInterval(scannerInterval); scannerInterval = null; }
   if (window._zxingReader) { window._zxingReader.reset(); window._zxingReader = null; }
   document.getElementById('scanner-wrap').style.display = 'none';
+  document.getElementById('ocr-capture-btn').style.display = 'none';
+}
+
+// ---------------------------------------------------------------------------
+// Mode texte (OCR) — Tesseract.js chargé à la demande, comme ZXing ci-dessus.
+// Capture ponctuelle (pas de boucle temps réel) : l'OCR est trop lent pour
+// tourner sur chaque frame, contrairement au scan de code-barre.
+// ---------------------------------------------------------------------------
+
+function ensureTesseractLoaded() {
+  if (window.Tesseract) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Tesseract.js non chargé'));
+    document.head.appendChild(script);
+  });
+}
+
+async function captureAndRecognizeText() {
+  const video = document.getElementById('scanner-video');
+  const status = document.getElementById('scanner-status');
+  const captureBtn = document.getElementById('ocr-capture-btn');
+
+  captureBtn.disabled = true;
+  status.textContent = 'Chargement du lecteur de texte...';
+  try {
+    await ensureTesseractLoaded();
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    status.textContent = 'Lecture du texte...';
+    // fra+eng : couvre titres FR et EN sans avoir à demander la langue à
+    // l'utilisateur (packs de langue téléchargés à la volée par Tesseract.js).
+    const worker = await Tesseract.createWorker('fra+eng');
+    const { data: { text } } = await worker.recognize(canvas);
+    await worker.terminate();
+
+    const cleaned = text.replace(/\s+/g, ' ').trim();
+    stopBarcodeScanner();
+    // L'OCR brut est peu fiable (bruit, mise en page, texte partiel) — on
+    // affiche la suggestion mais l'utilisateur corrige avant tout ajout,
+    // comme pour l'ajout manuel.
+    const guess = prompt('Texte lu sur la photo (corrigez si besoin) :', cleaned);
+    if (!guess || !guess.trim()) return;
+    const item = createAndQueueItem({ type: 'objet', code: '(texte scanné)', title: guess.trim() });
+    enrichEbayPrice(item);
+  } catch (err) {
+    showToast("Lecture du texte impossible — réessayez ou ajoutez l'objet manuellement.", true);
+    console.error('captureAndRecognizeText:', err);
+  } finally {
+    captureBtn.disabled = false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -518,6 +595,8 @@ function manualAdd() {
 
 function initUI() {
   document.getElementById('scan-btn').addEventListener('click', startBarcodeScanner);
+  document.getElementById('ocr-scan-btn').addEventListener('click', startOcrScanner);
+  document.getElementById('ocr-capture-btn').addEventListener('click', captureAndRecognizeText);
   document.getElementById('scanner-close-btn').addEventListener('click', stopBarcodeScanner);
   document.getElementById('manual-add-btn').addEventListener('click', manualAdd);
 
