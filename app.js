@@ -33,6 +33,25 @@ function isUrl(code) {
   return /^https?:\/\//i.test(code);
 }
 
+function guessTitleFromUrl(rawUrl) {
+  // Heuristique, pas une extraction fiable : on garde le nom de domaine (souvent
+  // la marque/enseigne) + les segments du chemin qui ressemblent à des mots de
+  // slug, et on jette protocole/www/paramètres/IDs purement numériques — tout
+  // ce qui casserait une recherche Google si on le laissait tel quel.
+  try {
+    const u = new URL(rawUrl);
+    const brand = u.hostname.replace(/^www\./i, '').split('.')[0];
+    const pathWords = u.pathname
+      .split('/')
+      .filter((seg) => seg && !/^\d+$/.test(seg))
+      .map((seg) => seg.replace(/[-_+]/g, ' '))
+      .join(' ');
+    return `${brand} ${pathWords}`.replace(/\s+/g, ' ').trim();
+  } catch {
+    return rawUrl;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Persistance locale
 // ---------------------------------------------------------------------------
@@ -217,12 +236,15 @@ function createAndQueueItem({ type, code, title, cover }) {
 }
 
 function addItem(type, code) {
-  const item = createAndQueueItem({ type, code, title: code });
+  const title = isUrl(code) ? guessTitleFromUrl(code) : code;
+  const item = createAndQueueItem({ type, code, title });
 
   if (type === 'livre') {
     identifyBook(item);
   } else if (isUrl(code)) {
-    showToast('QR code détecté — renommez le titre pour que les recherches fonctionnent 🔗');
+    // Titre déduit de l'URL (heuristique) plutôt que l'URL brute — pas
+    // toujours parfait, d'où l'invitation à vérifier plutôt qu'un silence.
+    showToast('QR code détecté — titre déduit du lien, vérifiez si besoin 🔗');
     enrichEbayPrice(item);
   } else {
     showToast('Code enregistré — renommez le titre si besoin 📦');
