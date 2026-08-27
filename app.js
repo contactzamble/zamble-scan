@@ -452,7 +452,9 @@ async function startBarcodeScanner() {
 
     if ('BarcodeDetector' in window) {
       const detector = new BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
+        // qr_code en plus des codes-barres 1D classiques : de plus en plus de
+        // produits l'utilisent à la place d'un EAN.
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code']
       });
       scannerInterval = setInterval(async () => {
         try {
