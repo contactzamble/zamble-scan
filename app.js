@@ -462,7 +462,7 @@ async function openScanner(mode) {
       // Pas de détection continue ici : on laisse l'utilisateur cadrer et
       // déclencher la capture lui-même (l'OCR est trop lent pour tourner en
       // boucle sur chaque frame comme le scan de code-barre).
-      status.textContent = 'Cadrez le titre/texte à lire, puis capturez.';
+      status.textContent = 'Cadrez du texte imprimé bien net (titre, boîte...), puis capturez.';
       captureBtn.style.display = 'inline-block';
       return;
     }
@@ -528,6 +528,33 @@ function stopBarcodeScanner() {
 // tourner sur chaque frame, contrairement au scan de code-barre.
 // ---------------------------------------------------------------------------
 
+function preprocessForOcr(canvas) {
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const d = imageData.data;
+
+  // Niveaux de gris (luminance) — Tesseract lit mieux le texte en N&B qu'en couleur.
+  let min = 255, max = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    d[i] = d[i + 1] = d[i + 2] = gray;
+    if (gray < min) min = gray;
+    if (gray > max) max = gray;
+  }
+  // Étirement de contraste (pas de binarisation : trop agressif sur des
+  // couvertures très colorées) — aide surtout les photos prises dans une
+  // lumière moyenne/terne où le texte reste à plat en gris.
+  const range = max - min || 1;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = ((d[i] - min) / range) * 255;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
 function ensureTesseractLoaded() {
   if (window.Tesseract) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -553,6 +580,7 @@ async function captureAndRecognizeText() {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
+    preprocessForOcr(canvas);
 
     status.textContent = 'Lecture du texte...';
     // fra+eng : couvre titres FR et EN sans avoir à demander la langue à
