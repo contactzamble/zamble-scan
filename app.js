@@ -33,20 +33,45 @@ function isUrl(code) {
   return /^https?:\/\//i.test(code);
 }
 
+// Mots de navigation/marketing qui reviennent sur beaucoup de sites et ne
+// désignent jamais un produit — liste volontairement courte (pas la peine
+// de la faire grossir au coup par coup, ça ne couvrira jamais tous les cas).
+const URL_TITLE_STOPWORDS = new Set([
+  'qrcode', 'qr', 'www', 'index', 'redirect', 'landing', 'campaign',
+  'promo', 'page', 'product', 'category', 'item', 'ref', 'utm', 'wheel'
+]);
+
 function guessTitleFromUrl(rawUrl) {
-  // Heuristique, pas une extraction fiable : on garde le nom de domaine (souvent
-  // la marque/enseigne) + les segments du chemin qui ressemblent à des mots de
-  // slug, et on jette protocole/www/paramètres/IDs purement numériques — tout
-  // ce qui casserait une recherche Google si on le laissait tel quel.
+  // Heuristique, pas une extraction fiable : certains QR codes ne pointent
+  // même pas vers une fiche produit (ex. page marketing type "roue de la
+  // fortune") — il n'y a alors aucun nom de produit à retrouver dans l'URL,
+  // et le nom de domaine (souvent la marque) reste le seul signal fiable.
   try {
     const u = new URL(rawUrl);
-    const brand = u.hostname.replace(/^www\./i, '').split('.')[0];
+    // Certaines marques utilisent un sous-domaine dédié aux QR codes
+    // (ex. "qrcode.marque.fr") — on saute ces labels génériques plutôt que de
+    // prendre bêtement le premier, sinon la marque elle-même est perdue.
+    const hostLabels = u.hostname.split('.');
+    const brand = hostLabels.find((l) => !['www', 'qr', 'qrcode'].includes(l.toLowerCase())) || hostLabels[0];
     const pathWords = u.pathname
       .split('/')
       .filter((seg) => seg && !/^\d+$/.test(seg))
-      .map((seg) => seg.replace(/[-_+]/g, ' '))
-      .join(' ');
-    return `${brand} ${pathWords}`.replace(/\s+/g, ' ').trim();
+      .flatMap((seg) => seg.replace(/[-_+]/g, ' ').split(' '))
+      // Mots de 1-2 lettres (codes pays/langue, fragments de route) et mots
+      // de navigation génériques : jamais un nom de produit.
+      .filter((word) => word.length >= 3 && !URL_TITLE_STOPWORDS.has(word.toLowerCase()));
+
+    // Dédoublonnage (insensible à la casse) : une marque répétée dans le
+    // chemin (sous-domaine + slug identique) ne doit apparaître qu'une fois.
+    const seen = new Set();
+    const words = [brand, ...pathWords].filter((w) => {
+      const key = w.toLowerCase();
+      if (!w || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return words.join(' ').trim();
   } catch {
     return rawUrl;
   }
