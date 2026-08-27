@@ -25,7 +25,10 @@
   </section>
 
   <div id="scanner-wrap" class="scanner-wrap" style="display:none;">
-    <video id="scanner-video" autoplay playsinline muted></video>
+    <div class="video-frame">
+      <video id="scanner-video" autoplay playsinline muted></video>
+      <div id="ocr-guide" class="ocr-guide" style="display:none;"></div>
+    </div>
     <p id="scanner-status" class="scanner-status">Pointez vers le code-barre...</p>
     <button type="button" id="ocr-capture-btn" class="ocr-capture-btn" style="display:none;">📸 Capturer le texte</button>
     <button type="button" id="scanner-close-btn" class="scanner-close-btn">✕ Fermer</button>

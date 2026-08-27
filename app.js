@@ -445,6 +445,7 @@ async function openScanner(mode) {
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
   const captureBtn = document.getElementById('ocr-capture-btn');
+  const guide = document.getElementById('ocr-guide');
 
   if (!navigator.mediaDevices?.getUserMedia) {
     showToast('Caméra non disponible sur cet appareil.', true);
@@ -462,12 +463,14 @@ async function openScanner(mode) {
       // Pas de détection continue ici : on laisse l'utilisateur cadrer et
       // déclencher la capture lui-même (l'OCR est trop lent pour tourner en
       // boucle sur chaque frame comme le scan de code-barre).
-      status.textContent = 'Cadrez du texte imprimé bien net (titre, boîte...), puis capturez.';
+      status.textContent = 'Alignez UN mot dans le cadre (rien d\'autre autour), puis capturez.';
       captureBtn.style.display = 'inline-block';
+      guide.style.display = 'block';
       return;
     }
 
     captureBtn.style.display = 'none';
+    guide.style.display = 'none';
     status.textContent = 'Pointez vers le code-barre...';
 
     if ('BarcodeDetector' in window) {
@@ -520,6 +523,7 @@ function stopBarcodeScanner() {
   if (window._zxingReader) { window._zxingReader.reset(); window._zxingReader = null; }
   document.getElementById('scanner-wrap').style.display = 'none';
   document.getElementById('ocr-capture-btn').style.display = 'none';
+  document.getElementById('ocr-guide').style.display = 'none';
 }
 
 // ---------------------------------------------------------------------------
@@ -576,10 +580,18 @@ async function captureAndRecognizeText() {
   try {
     await ensureTesseractLoaded();
 
+    // On ne garde que la zone du cadre de visée (mêmes proportions que
+    // #ocr-guide en CSS) plutôt que l'image entière : sur un objet réel
+    // (boutons, molettes, autres inscriptions...), donner toute la scène à
+    // Tesseract produit des caractères parasites même quand le mot visé est net.
+    const sx = video.videoWidth * 0.10;
+    const sy = video.videoHeight * 0.40;
+    const sw = video.videoWidth * 0.80;
+    const sh = video.videoHeight * 0.20;
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.width = sw;
+    canvas.height = sh;
+    canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
     preprocessForOcr(canvas);
 
     status.textContent = 'Lecture du texte...';
