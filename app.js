@@ -426,37 +426,16 @@ function updateSequentialUI() {
 }
 
 // ---------------------------------------------------------------------------
-// Scanner — code-barre (repris de l'ancien zamble.fr) + mode texte (OCR)
+// Scanner code-barre — repris de l'ancien zamble.fr
 // ---------------------------------------------------------------------------
 
 let scannerStream = null;
 let scannerInterval = null;
-let scannerMode = 'barcode';
 
 async function startBarcodeScanner() {
-  return openScanner('barcode');
-}
-
-async function startOcrScanner() {
-  return openScanner('ocr');
-}
-
-async function startVisionScanner() {
-  return openScanner('vision');
-}
-
-function onCaptureClick() {
-  if (scannerMode === 'ocr') return captureAndRecognizeText();
-  if (scannerMode === 'vision') return captureAndRecognizePhoto();
-}
-
-async function openScanner(mode) {
-  scannerMode = mode;
   const wrap = document.getElementById('scanner-wrap');
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
-  const captureBtn = document.getElementById('capture-btn');
-  const guide = document.getElementById('ocr-guide');
 
   if (!navigator.mediaDevices?.getUserMedia) {
     showToast('Caméra non disponible sur cet appareil.', true);
@@ -469,30 +448,6 @@ async function openScanner(mode) {
     });
     video.srcObject = scannerStream;
     wrap.style.display = 'flex';
-
-    if (mode === 'ocr') {
-      // Pas de détection continue ici : on laisse l'utilisateur cadrer et
-      // déclencher la capture lui-même (l'OCR est trop lent pour tourner en
-      // boucle sur chaque frame comme le scan de code-barre).
-      status.textContent = 'Alignez UN mot dans le cadre (rien d\'autre autour), puis capturez.';
-      captureBtn.textContent = '📸 Capturer le texte';
-      captureBtn.style.display = 'inline-block';
-      guide.style.display = 'block';
-      return;
-    }
-
-    if (mode === 'vision') {
-      // Pas de cadre de visée ici, contrairement à l'OCR : Vision a besoin de
-      // voir l'objet entier (forme, couleurs, logo) plutôt qu'une zone étroite.
-      status.textContent = "Cadrez l'objet entier (marque/logo visible si possible), puis capturez.";
-      captureBtn.textContent = '📸 Capturer la photo';
-      captureBtn.style.display = 'inline-block';
-      guide.style.display = 'none';
-      return;
-    }
-
-    captureBtn.style.display = 'none';
-    guide.style.display = 'none';
     status.textContent = 'Pointez vers le code-barre...';
 
     if ('BarcodeDetector' in window) {
@@ -544,147 +499,6 @@ function stopBarcodeScanner() {
   if (scannerInterval) { clearInterval(scannerInterval); scannerInterval = null; }
   if (window._zxingReader) { window._zxingReader.reset(); window._zxingReader = null; }
   document.getElementById('scanner-wrap').style.display = 'none';
-  document.getElementById('capture-btn').style.display = 'none';
-  document.getElementById('ocr-guide').style.display = 'none';
-}
-
-// ---------------------------------------------------------------------------
-// Mode texte (OCR) — Tesseract.js chargé à la demande, comme ZXing ci-dessus.
-// Capture ponctuelle (pas de boucle temps réel) : l'OCR est trop lent pour
-// tourner sur chaque frame, contrairement au scan de code-barre.
-// ---------------------------------------------------------------------------
-
-function preprocessForOcr(canvas) {
-  const ctx = canvas.getContext('2d');
-  const { width, height } = canvas;
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const d = imageData.data;
-
-  // Niveaux de gris (luminance) — Tesseract lit mieux le texte en N&B qu'en couleur.
-  let min = 255, max = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    d[i] = d[i + 1] = d[i + 2] = gray;
-    if (gray < min) min = gray;
-    if (gray > max) max = gray;
-  }
-  // Étirement de contraste (pas de binarisation : trop agressif sur des
-  // couvertures très colorées) — aide surtout les photos prises dans une
-  // lumière moyenne/terne où le texte reste à plat en gris.
-  const range = max - min || 1;
-  for (let i = 0; i < d.length; i += 4) {
-    const v = ((d[i] - min) / range) * 255;
-    d[i] = d[i + 1] = d[i + 2] = v;
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-  return canvas;
-}
-
-function ensureTesseractLoaded() {
-  if (window.Tesseract) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-    script.onload = resolve;
-    script.onerror = () => reject(new Error('Tesseract.js non chargé'));
-    document.head.appendChild(script);
-  });
-}
-
-async function captureAndRecognizeText() {
-  const video = document.getElementById('scanner-video');
-  const status = document.getElementById('scanner-status');
-  const captureBtn = document.getElementById('capture-btn');
-
-  captureBtn.disabled = true;
-  status.textContent = 'Chargement du lecteur de texte...';
-  try {
-    await ensureTesseractLoaded();
-
-    // On ne garde que la zone du cadre de visée (mêmes proportions que
-    // #ocr-guide en CSS) plutôt que l'image entière : sur un objet réel
-    // (boutons, molettes, autres inscriptions...), donner toute la scène à
-    // Tesseract produit des caractères parasites même quand le mot visé est net.
-    const sx = video.videoWidth * 0.10;
-    const sy = video.videoHeight * 0.40;
-    const sw = video.videoWidth * 0.80;
-    const sh = video.videoHeight * 0.20;
-    const canvas = document.createElement('canvas');
-    canvas.width = sw;
-    canvas.height = sh;
-    canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-    preprocessForOcr(canvas);
-
-    status.textContent = 'Lecture du texte...';
-    // fra+eng : couvre titres FR et EN sans avoir à demander la langue à
-    // l'utilisateur (packs de langue téléchargés à la volée par Tesseract.js).
-    const worker = await Tesseract.createWorker('fra+eng');
-    const { data: { text } } = await worker.recognize(canvas);
-    await worker.terminate();
-
-    const cleaned = text.replace(/\s+/g, ' ').trim();
-    stopBarcodeScanner();
-    // L'OCR brut est peu fiable (bruit, mise en page, texte partiel) — on
-    // affiche la suggestion mais l'utilisateur corrige avant tout ajout,
-    // comme pour l'ajout manuel.
-    const guess = prompt('Texte lu sur la photo (corrigez si besoin) :', cleaned);
-    if (!guess || !guess.trim()) return;
-    const item = createAndQueueItem({ type: 'objet', code: '(texte scanné)', title: guess.trim() });
-    enrichEbayPrice(item);
-  } catch (err) {
-    showToast("Lecture du texte impossible — réessayez ou ajoutez l'objet manuellement.", true);
-    console.error('captureAndRecognizeText:', err);
-  } finally {
-    captureBtn.disabled = false;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Mode reconnaissance photo (Google Vision : logo/texte/label) — test en
-// cours, backend zamble-search-api (route /vision-search), quota mensuel
-// géré côté Worker.
-// ---------------------------------------------------------------------------
-
-const MATCH_TYPE_LABELS = { logo: 'marque', text: 'texte', label: 'catégorie' };
-
-async function captureAndRecognizePhoto() {
-  const video = document.getElementById('scanner-video');
-  const status = document.getElementById('scanner-status');
-  const captureBtn = document.getElementById('capture-btn');
-
-  captureBtn.disabled = true;
-  status.textContent = 'Analyse de la photo...';
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    // JPEG compressé : suffisant pour Vision, et le Worker plafonne la taille
-    // de l'image reçue (~2 Mo en base64, cf MAX_IMAGE_BASE64_LENGTH côté API).
-    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-
-    const r = await fetch(`${SEARCH_API_URL}/vision-search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64 }),
-      signal: AbortSignal.timeout(15000)
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.message || data.error || `Erreur ${r.status}`);
-
-    stopBarcodeScanner();
-    const matchLabel = MATCH_TYPE_LABELS[data.matchType] || 'résultat';
-    const guess = prompt(`Vision a reconnu (${matchLabel}) — corrigez si besoin :`, data.label || '');
-    if (!guess || !guess.trim()) return;
-    const item = createAndQueueItem({ type: 'objet', code: '(reconnaissance photo)', title: guess.trim() });
-    enrichEbayPrice(item);
-  } catch (err) {
-    showToast(`Reconnaissance photo impossible : ${err.message || err}`, true);
-    console.error('captureAndRecognizePhoto:', err);
-  } finally {
-    captureBtn.disabled = false;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -704,9 +518,6 @@ function manualAdd() {
 
 function initUI() {
   document.getElementById('scan-btn').addEventListener('click', startBarcodeScanner);
-  document.getElementById('ocr-scan-btn').addEventListener('click', startOcrScanner);
-  document.getElementById('vision-scan-btn').addEventListener('click', startVisionScanner);
-  document.getElementById('capture-btn').addEventListener('click', onCaptureClick);
   document.getElementById('scanner-close-btn').addEventListener('click', stopBarcodeScanner);
   document.getElementById('manual-add-btn').addEventListener('click', manualAdd);
 
