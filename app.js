@@ -431,6 +431,7 @@ function updateSequentialUI() {
 
 let scannerStream = null;
 let scannerInterval = null;
+let scannerMode = 'barcode';
 
 async function startBarcodeScanner() {
   return openScanner('barcode');
@@ -440,11 +441,21 @@ async function startOcrScanner() {
   return openScanner('ocr');
 }
 
+async function startVisionScanner() {
+  return openScanner('vision');
+}
+
+function onCaptureClick() {
+  if (scannerMode === 'ocr') return captureAndRecognizeText();
+  if (scannerMode === 'vision') return captureAndRecognizePhoto();
+}
+
 async function openScanner(mode) {
+  scannerMode = mode;
   const wrap = document.getElementById('scanner-wrap');
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
-  const captureBtn = document.getElementById('ocr-capture-btn');
+  const captureBtn = document.getElementById('capture-btn');
   const guide = document.getElementById('ocr-guide');
 
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -464,8 +475,19 @@ async function openScanner(mode) {
       // déclencher la capture lui-même (l'OCR est trop lent pour tourner en
       // boucle sur chaque frame comme le scan de code-barre).
       status.textContent = 'Alignez UN mot dans le cadre (rien d\'autre autour), puis capturez.';
+      captureBtn.textContent = '📸 Capturer le texte';
       captureBtn.style.display = 'inline-block';
       guide.style.display = 'block';
+      return;
+    }
+
+    if (mode === 'vision') {
+      // Pas de cadre de visée ici, contrairement à l'OCR : Vision a besoin de
+      // voir l'objet entier (forme, couleurs, logo) plutôt qu'une zone étroite.
+      status.textContent = "Cadrez l'objet entier (marque/logo visible si possible), puis capturez.";
+      captureBtn.textContent = '📸 Capturer la photo';
+      captureBtn.style.display = 'inline-block';
+      guide.style.display = 'none';
       return;
     }
 
@@ -522,7 +544,7 @@ function stopBarcodeScanner() {
   if (scannerInterval) { clearInterval(scannerInterval); scannerInterval = null; }
   if (window._zxingReader) { window._zxingReader.reset(); window._zxingReader = null; }
   document.getElementById('scanner-wrap').style.display = 'none';
-  document.getElementById('ocr-capture-btn').style.display = 'none';
+  document.getElementById('capture-btn').style.display = 'none';
   document.getElementById('ocr-guide').style.display = 'none';
 }
 
@@ -573,7 +595,7 @@ function ensureTesseractLoaded() {
 async function captureAndRecognizeText() {
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
-  const captureBtn = document.getElementById('ocr-capture-btn');
+  const captureBtn = document.getElementById('capture-btn');
 
   captureBtn.disabled = true;
   status.textContent = 'Chargement du lecteur de texte...';
@@ -619,6 +641,53 @@ async function captureAndRecognizeText() {
 }
 
 // ---------------------------------------------------------------------------
+// Mode reconnaissance photo (Google Vision : logo/texte/label) — test en
+// cours, backend zamble-search-api (route /vision-search), quota mensuel
+// géré côté Worker.
+// ---------------------------------------------------------------------------
+
+const MATCH_TYPE_LABELS = { logo: 'marque', text: 'texte', label: 'catégorie' };
+
+async function captureAndRecognizePhoto() {
+  const video = document.getElementById('scanner-video');
+  const status = document.getElementById('scanner-status');
+  const captureBtn = document.getElementById('capture-btn');
+
+  captureBtn.disabled = true;
+  status.textContent = 'Analyse de la photo...';
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    // JPEG compressé : suffisant pour Vision, et le Worker plafonne la taille
+    // de l'image reçue (~2 Mo en base64, cf MAX_IMAGE_BASE64_LENGTH côté API).
+    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+    const r = await fetch(`${SEARCH_API_URL}/vision-search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || data.error || `Erreur ${r.status}`);
+
+    stopBarcodeScanner();
+    const matchLabel = MATCH_TYPE_LABELS[data.matchType] || 'résultat';
+    const guess = prompt(`Vision a reconnu (${matchLabel}) — corrigez si besoin :`, data.label || '');
+    if (!guess || !guess.trim()) return;
+    const item = createAndQueueItem({ type: 'objet', code: '(reconnaissance photo)', title: guess.trim() });
+    enrichEbayPrice(item);
+  } catch (err) {
+    showToast(`Reconnaissance photo impossible : ${err.message || err}`, true);
+    console.error('captureAndRecognizePhoto:', err);
+  } finally {
+    captureBtn.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Ajout manuel (sans scanner)
 // ---------------------------------------------------------------------------
 
@@ -636,7 +705,8 @@ function manualAdd() {
 function initUI() {
   document.getElementById('scan-btn').addEventListener('click', startBarcodeScanner);
   document.getElementById('ocr-scan-btn').addEventListener('click', startOcrScanner);
-  document.getElementById('ocr-capture-btn').addEventListener('click', captureAndRecognizeText);
+  document.getElementById('vision-scan-btn').addEventListener('click', startVisionScanner);
+  document.getElementById('capture-btn').addEventListener('click', onCaptureClick);
   document.getElementById('scanner-close-btn').addEventListener('click', stopBarcodeScanner);
   document.getElementById('manual-add-btn').addEventListener('click', manualAdd);
 
