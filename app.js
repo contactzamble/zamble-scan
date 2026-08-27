@@ -448,7 +448,7 @@ async function startBarcodeScanner() {
     });
     video.srcObject = scannerStream;
     wrap.style.display = 'flex';
-    status.textContent = 'Pointez vers le code-barre...';
+    status.textContent = 'Pointez vers le code-barre ou QR code...';
 
     if ('BarcodeDetector' in window) {
       const detector = new BarcodeDetector({
@@ -467,7 +467,7 @@ async function startBarcodeScanner() {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js';
       script.onload = () => {
-        status.textContent = 'Pointez vers le code-barre...';
+        status.textContent = 'Pointez vers le code-barre ou QR code...';
         const codeReader = new ZXing.BrowserMultiFormatReader();
         codeReader.decodeFromVideoElement(video, (result) => {
           if (result) onBarcodeDetected(result.getText());
