@@ -483,13 +483,15 @@ async function startBarcodeScanner() {
     });
     video.srcObject = scannerStream;
     wrap.style.display = 'flex';
-    status.textContent = 'Pointez vers le code-barre ou QR code...';
+    status.textContent = 'Pointez vers le code-barre...';
 
     if ('BarcodeDetector' in window) {
       const detector = new BarcodeDetector({
-        // qr_code en plus des codes-barres 1D classiques : de plus en plus de
-        // produits l'utilisent à la place d'un EAN.
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code']
+        // qr_code retiré : sur Android, l'ajouter déclenche le téléchargement
+        // d'un module Play Services (ML Kit) supplémentaire, et tant qu'il
+        // n'est pas prêt TOUTE la détection reste vide (confirmé en test réel
+        // — même les codes-barres classiques ne remontaient plus).
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
       });
       scannerInterval = setInterval(async () => {
         try {
@@ -502,7 +504,7 @@ async function startBarcodeScanner() {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js';
       script.onload = () => {
-        status.textContent = 'Pointez vers le code-barre ou QR code...';
+        status.textContent = 'Pointez vers le code-barre...';
         const codeReader = new ZXing.BrowserMultiFormatReader();
         codeReader.decodeFromVideoElement(video, (result) => {
           if (result) onBarcodeDetected(result.getText());
