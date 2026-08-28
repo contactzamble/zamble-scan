@@ -129,7 +129,8 @@ async function lookupOpenLibrary(isbn) {
     const book = data[key];
     return {
       title: book.title || null,
-      author: book.authors?.[0]?.name || null,
+      author: (book.authors || []).map((a) => a.name).filter(Boolean).join(', ') || null,
+      publisher: book.publishers?.[0]?.name || null,
       cover: book.cover?.large || book.cover?.medium || null
     };
   } catch { return null; }
@@ -148,7 +149,8 @@ async function lookupGoogleBooks(isbn) {
       ?.replace('http://', 'https://');
     return {
       title: info.title || null,
-      author: info.authors?.[0] || null,
+      author: (info.authors || []).join(', ') || null,
+      publisher: info.publisher || null,
       cover: cover || null
     };
   } catch { return null; }
@@ -237,6 +239,16 @@ function buildFilteredSearchUrl(query, suffix) {
   return buildGoogleUrl(`${query} ${suffix}`);
 }
 
+// Requête enrichie auteur(s)/éditeur pour les livres — un simple titre comme
+// "Les Dinosaures" est trop générique pour retrouver la bonne édition sur un
+// moteur de recherche généraliste.
+function buildSearchQuery(item) {
+  const parts = [item.title];
+  if (item.author) parts.push(item.author);
+  if (item.publisher) parts.push(item.publisher);
+  return parts.join(' ');
+}
+
 // ---------------------------------------------------------------------------
 // Gestion des objets
 // ---------------------------------------------------------------------------
@@ -248,6 +260,7 @@ function createAndQueueItem({ type, code, title, cover }) {
     code,
     title,
     author: null,
+    publisher: null,
     cover: cover || null,
     priceStatus: null,
     ebayPrice: null,
@@ -285,6 +298,7 @@ async function identifyBook(item) {
   if (found?.title) {
     current.title = found.title;
     current.author = found.author;
+    current.publisher = found.publisher;
     current.cover = found.cover;
     showToast('Livre trouvé ! ✨');
   } else {
@@ -365,7 +379,8 @@ function render() {
     const meta = document.createElement('div');
     meta.className = 'item-meta';
     meta.textContent = (item.type === 'livre' ? '📚' : '📦') +
-      (item.author ? ` ${item.author}` : '') + ` · ${item.code}`;
+      (item.author ? ` ${item.author}` : '') +
+      (item.publisher ? ` · ${item.publisher}` : '') + ` · ${item.code}`;
     body.appendChild(meta);
 
     const price = document.createElement('div');
@@ -386,17 +401,18 @@ function render() {
     // Lien direct en premier si le code scanné est une URL (QR code) — la
     // source la plus fiable, avant les recherches génériques par titre.
     if (isUrl(item.code)) links.appendChild(makeLinkBtn('🔗 Page produit', item.code));
-    links.appendChild(makeLinkBtn('Google', buildGoogleUrl(item.title)));
-    links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(item.title)));
-    links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(item.title)));
-    links.appendChild(makeLinkBtn('Etsy', buildEtsyUrl(item.title)));
+    const query = buildSearchQuery(item);
+    links.appendChild(makeLinkBtn('Google', buildGoogleUrl(query)));
+    links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(query)));
+    links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(query)));
+    links.appendChild(makeLinkBtn('Etsy', buildEtsyUrl(query)));
     if (item.ebayUrl) links.appendChild(makeLinkBtn('eBay', item.ebayUrl));
     body.appendChild(links);
 
     const filterLinks = document.createElement('div');
     filterLinks.className = 'item-links item-filter-links';
     for (const f of SEARCH_FILTERS) {
-      filterLinks.appendChild(makeLinkBtn(f.label, buildFilteredSearchUrl(item.title, f.suffix)));
+      filterLinks.appendChild(makeLinkBtn(f.label, buildFilteredSearchUrl(query, f.suffix)));
     }
     body.appendChild(filterLinks);
 
@@ -457,7 +473,7 @@ function openNextSequential() {
     return;
   }
   const item = items.find((it) => it.id === ids[index]);
-  if (item) window.open(buildGoogleUrl(item.title), '_blank');
+  if (item) window.open(buildGoogleUrl(buildSearchQuery(item)), '_blank');
   sequentialQueue.index++;
   updateSequentialUI();
 }
