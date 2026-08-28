@@ -11,6 +11,13 @@ const STORAGE_KEY = 'zamble-scan-items';
 // ce ne sont pas des secrets, un tag affilié est public par nature dans un lien.
 const AMAZON_ASSOCIATE_TAG = 'bonsplanszamble-21';
 
+// Message unique quel que soit le service externe qui a atteint sa limite
+// (Vision, Google Books, UPCitemdb...) — même texte que côté Worker
+// (src/index.ts, FREE_QUOTA_MESSAGE) : tout reste gratuit tant qu'aucune
+// limite n'est touchée, et le jour où l'une l'est, même message partout.
+const FREE_QUOTA_MESSAGE =
+  "Vous avez atteint le nombre de requêtes maximal pour un usage en mode gratuit. Pour repousser cette limite, abonnez-vous à l'option de votre choix.";
+
 // ---------------------------------------------------------------------------
 // État
 // ---------------------------------------------------------------------------
@@ -147,6 +154,7 @@ async function lookupGoogleBooks(isbn) {
     });
     if (!r.ok) return null;
     const data = await r.json();
+    if (data.quotaExceeded) return { quotaExceeded: true };
     return data.title ? data : null;
   } catch { return null; }
 }
@@ -155,6 +163,7 @@ async function lookupISBN(isbn) {
   const fromOL = await lookupOpenLibrary(isbn);
   if (fromOL?.title) return fromOL;
   const fromGB = await lookupGoogleBooks(isbn);
+  if (fromGB?.quotaExceeded) return { quotaExceeded: true };
   if (fromGB?.title) return fromGB;
   return null;
 }
@@ -171,6 +180,7 @@ async function lookupProduct(code) {
     });
     if (!r.ok) return null;
     const data = await r.json();
+    if (data.quotaExceeded) return { quotaExceeded: true };
     return { title: data.title || null, brand: data.brand || null };
   } catch { return null; }
 }
@@ -306,7 +316,9 @@ async function identifyProduct(item) {
   const found = await lookupProduct(item.code);
   const current = items.find((i) => i.id === item.id);
   if (!current) return; // supprimé entre-temps
-  if (found?.title) {
+  if (found?.quotaExceeded) {
+    showToast(FREE_QUOTA_MESSAGE, true);
+  } else if (found?.title) {
     current.title = found.title;
     current.publisher = found.brand;
     showToast('Produit trouvé ! ✨');
@@ -323,7 +335,9 @@ async function identifyBook(item) {
   const found = await lookupISBN(item.code);
   const current = items.find((i) => i.id === item.id);
   if (!current) return; // supprimé entre-temps
-  if (found?.title) {
+  if (found?.quotaExceeded) {
+    showToast(FREE_QUOTA_MESSAGE, true);
+  } else if (found?.title) {
     current.title = found.title;
     current.author = found.author;
     current.publisher = found.publisher;
