@@ -423,7 +423,6 @@ function render() {
       price.textContent = 'Prix eBay non trouvé';
     }
     body.appendChild(price);
-    body.appendChild(makeConditionPicker(item));
 
     const links = document.createElement('div');
     links.className = 'item-links';
@@ -460,31 +459,66 @@ function render() {
   updateBatchButtonsState();
 }
 
-// États proposés pour la fiche copiable — vocabulaire Vinted (plateforme
-// principale visée), assez générique pour rester compréhensible tel quel
-// collé dans la description Leboncoin/eBay malgré leurs propres libellés.
-const CONDITIONS = ['Neuf', 'Très bon état', 'Bon état', 'État satisfaisant'];
+// États proposés dans la fenêtre "Créer une annonce" — vocabulaire dicté par
+// l'utilisateur, assez générique pour rester compréhensible tel quel collé
+// dans la description Vinted/Leboncoin/eBay malgré leurs propres libellés.
+const CONDITIONS = ['Mauvais état', 'Bon état', 'Très bon état', 'État neuf'];
 const DEFAULT_CONDITION = 'Bon état';
 
-// Fiche prête à coller dans un formulaire Vinted/Leboncoin — pas d'API de
-// publication disponible chez eux, donc on facilite le collage manuel. Seul
-// l'état est à choisir avant de copier, le reste est déjà rempli.
-function buildFicheText(item) {
-  const lines = [item.title];
-  if (item.author) lines.push(`Auteur : ${item.author}`);
-  if (item.publisher) lines.push(`Éditeur : ${item.publisher}`);
-  lines.push(`État : ${item.condition || DEFAULT_CONDITION}`);
-  lines.push(item.priceStatus === 'found'
-    ? `Prix indicatif (eBay) : ${item.ebayPrice} €`
-    : 'Prix indicatif (eBay) : non trouvé');
+// Objet en cours d'édition dans la fenêtre "Créer une annonce" (un seul à la
+// fois, la fenêtre est modale).
+let currentAdItem = null;
+
+// Texte type d'annonce, différent livre/objet générique (jeu, jouet...) —
+// l'état choisi est injecté directement dans la phrase plutôt qu'affiché en
+// simple métadonnée à part, pour donner un texte déjà prêt à publier tel quel.
+function buildAdText(item, condition) {
+  const priceLine = item.priceStatus === 'found'
+    ? `Prix indicatif du marché (eBay) : ${item.ebayPrice} €`
+    : 'Prix à négocier selon le marché de l\'occasion.';
+
+  if (item.type === 'livre') {
+    const lines = [`📚 ${item.title}`];
+    if (item.author) lines.push(`Auteur : ${item.author}`);
+    if (item.publisher) lines.push(`Éditeur : ${item.publisher}`);
+    lines.push('');
+    lines.push(`Livre en ${condition.toLowerCase()}, vendu par un particulier. N'hésitez pas à demander des photos supplémentaires ou des précisions avant achat.`);
+    lines.push('');
+    lines.push(priceLine);
+    return lines.join('\n');
+  }
+
+  const lines = [`📦 ${item.title}`];
+  if (item.publisher) lines.push(`Marque/éditeur : ${item.publisher}`);
+  lines.push('');
+  lines.push(`Article en ${condition.toLowerCase()}, vendu par un particulier. N'hésitez pas à demander des photos supplémentaires ou des précisions avant achat.`);
+  lines.push('');
+  lines.push(priceLine);
   return lines.join('\n');
 }
 
-// Fiche éditable avant copie — la fiche générée est un point de départ,
-// l'utilisatrice doit pouvoir la corriger/compléter à sa guise avant de
-// coller dans Vinted/Leboncoin (ex. préciser un défaut, changer le ton).
-function openFicheModal(item) {
-  document.getElementById('fiche-textarea').value = buildFicheText(item);
+function renderAdConditionPicker() {
+  const wrap = document.getElementById('ad-condition-picker');
+  wrap.innerHTML = '';
+  for (const c of CONDITIONS) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'condition-chip' + (currentAdItem.condition === c ? ' selected' : '');
+    chip.textContent = c;
+    chip.addEventListener('click', () => {
+      currentAdItem.condition = c;
+      saveItems();
+      document.getElementById('fiche-textarea').value = buildAdText(currentAdItem, c);
+      renderAdConditionPicker();
+    });
+    wrap.appendChild(chip);
+  }
+}
+
+function openAdModal(item) {
+  currentAdItem = item;
+  renderAdConditionPicker();
+  document.getElementById('fiche-textarea').value = buildAdText(item, item.condition || DEFAULT_CONDITION);
   document.getElementById('fiche-modal').style.display = 'flex';
 }
 
@@ -496,37 +530,19 @@ async function confirmCopyFiche() {
   const text = document.getElementById('fiche-textarea').value;
   try {
     await navigator.clipboard.writeText(text);
-    showToast('Fiche copiée — colle-la dans Vinted/Leboncoin 📋');
+    showToast('Annonce copiée — colle-la dans Vinted/Leboncoin 📋');
   } catch {
     showToast("Impossible de copier automatiquement — copiez le texte manuellement.", true);
   }
   closeFicheModal();
 }
 
-function makeConditionPicker(item) {
-  const wrap = document.createElement('div');
-  wrap.className = 'condition-picker';
-  for (const c of CONDITIONS) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'condition-chip' + (item.condition === c ? ' selected' : '');
-    chip.textContent = c;
-    chip.addEventListener('click', () => {
-      item.condition = c;
-      saveItems();
-      render();
-    });
-    wrap.appendChild(chip);
-  }
-  return wrap;
-}
-
 function makeCopyBtn(item) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'copy-fiche-btn';
-  btn.textContent = '📋 Copier';
-  btn.addEventListener('click', () => openFicheModal(item));
+  btn.textContent = '📝 Créer une annonce';
+  btn.addEventListener('click', () => openAdModal(item));
   return btn;
 }
 

@@ -240,7 +240,10 @@ main { padding: 1rem; max-width: 640px; margin: 0 auto; }
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
-  z-index: 150;
+  /* Sous le topbar (z-index 10) et la barre de raccourcis (z-index 9) —
+     demandé explicitement : ces deux bandeaux doivent rester visibles et
+     cliquables par-dessus le fond assombri de cette fenêtre. */
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
