@@ -485,14 +485,27 @@ function buildFicheText(item) {
   return lines.join('\n');
 }
 
-async function copyFiche(item) {
-  const text = buildFicheText(item);
+// Fiche éditable avant copie — la fiche générée est un point de départ,
+// l'utilisatrice doit pouvoir la corriger/compléter à sa guise avant de
+// coller dans Vinted/Leboncoin (ex. préciser un défaut, changer le ton).
+function openFicheModal(item) {
+  document.getElementById('fiche-textarea').value = buildFicheText(item);
+  document.getElementById('fiche-modal').style.display = 'flex';
+}
+
+function closeFicheModal() {
+  document.getElementById('fiche-modal').style.display = 'none';
+}
+
+async function confirmCopyFiche() {
+  const text = document.getElementById('fiche-textarea').value;
   try {
     await navigator.clipboard.writeText(text);
     showToast('Fiche copiée — colle-la dans Vinted/Leboncoin 📋');
   } catch {
     showToast("Impossible de copier automatiquement — copiez le texte manuellement.", true);
   }
+  closeFicheModal();
 }
 
 function makeConditionPicker(item) {
@@ -518,7 +531,7 @@ function makeCopyBtn(item) {
   btn.type = 'button';
   btn.className = 'copy-fiche-btn';
   btn.textContent = '📋 Copier';
-  btn.addEventListener('click', () => copyFiche(item));
+  btn.addEventListener('click', () => openFicheModal(item));
   return btn;
 }
 
@@ -715,6 +728,9 @@ function initUI() {
   });
   document.getElementById('open-selected-btn').addEventListener('click', startSequentialOpen);
   document.getElementById('clear-all-btn').addEventListener('click', clearAllItems);
+
+  document.getElementById('fiche-cancel-btn').addEventListener('click', closeFicheModal);
+  document.getElementById('fiche-confirm-btn').addEventListener('click', confirmCopyFiche);
 
   render();
 

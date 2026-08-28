@@ -53,6 +53,17 @@
   <p id="empty-state" class="empty-state">Aucun objet scanné pour l'instant — scannez un livre ou un jeu pour commencer.</p>
 </main>
 
+<div id="fiche-modal" class="fiche-modal" style="display:none;">
+  <div class="fiche-modal-box">
+    <p class="fiche-modal-title">Modifier avant de copier</p>
+    <textarea id="fiche-textarea" class="fiche-textarea" rows="8"></textarea>
+    <div class="fiche-modal-actions">
+      <button type="button" id="fiche-cancel-btn" class="manual-btn">Annuler</button>
+      <button type="button" id="fiche-confirm-btn" class="scan-btn">📋 Copier</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast" style="display:none;"></div>
 
 <script src="app.js"></script>
