@@ -165,6 +165,22 @@ async function lookupISBN(isbn) {
 }
 
 // ---------------------------------------------------------------------------
+// Lookup code-barres générique (jeux, jouets...) via zamble-search-api
+// (UPCitemdb) — équivalent de lookupISBN pour tout ce qui n'est pas un livre.
+// ---------------------------------------------------------------------------
+
+async function lookupProduct(code) {
+  try {
+    const r = await fetch(`${SEARCH_API_URL}/product-lookup?upc=${encodeURIComponent(code)}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return { title: data.title || null, brand: data.brand || null };
+  } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------
 // Enrichissement prix eBay (best-effort, silencieux si échec) via zamble-search-api
 // ---------------------------------------------------------------------------
 
@@ -261,6 +277,7 @@ function createAndQueueItem({ type, code, title, cover }) {
     title,
     author: null,
     publisher: null,
+    condition: DEFAULT_CONDITION,
     cover: cover || null,
     priceStatus: null,
     ebayPrice: null,
@@ -285,9 +302,25 @@ function addItem(type, code) {
     showToast('QR code détecté — titre déduit du lien, vérifiez si besoin 🔗');
     enrichEbayPrice(item);
   } else {
-    showToast('Code enregistré — renommez le titre si besoin 📦');
-    enrichEbayPrice(item);
+    identifyProduct(item);
   }
+}
+
+async function identifyProduct(item) {
+  showToast('Recherche du produit... 🔍');
+  const found = await lookupProduct(item.code);
+  const current = items.find((i) => i.id === item.id);
+  if (!current) return; // supprimé entre-temps
+  if (found?.title) {
+    current.title = found.title;
+    current.publisher = found.brand;
+    showToast('Produit trouvé ! ✨');
+  } else {
+    showToast('Produit non trouvé — renommez le titre si besoin 📦', true);
+  }
+  saveItems();
+  render();
+  enrichEbayPrice(current);
 }
 
 async function identifyBook(item) {
@@ -395,6 +428,7 @@ function render() {
       price.textContent = 'Prix eBay non trouvé';
     }
     body.appendChild(price);
+    body.appendChild(makeConditionPicker(item));
 
     const links = document.createElement('div');
     links.className = 'item-links';
@@ -431,12 +465,20 @@ function render() {
   updateBatchButtonsState();
 }
 
+// États proposés pour la fiche copiable — vocabulaire Vinted (plateforme
+// principale visée), assez générique pour rester compréhensible tel quel
+// collé dans la description Leboncoin/eBay malgré leurs propres libellés.
+const CONDITIONS = ['Neuf', 'Très bon état', 'Bon état', 'État satisfaisant'];
+const DEFAULT_CONDITION = 'Bon état';
+
 // Fiche prête à coller dans un formulaire Vinted/Leboncoin — pas d'API de
-// publication disponible chez eux, donc on facilite le collage manuel.
+// publication disponible chez eux, donc on facilite le collage manuel. Seul
+// l'état est à choisir avant de copier, le reste est déjà rempli.
 function buildFicheText(item) {
   const lines = [item.title];
   if (item.author) lines.push(`Auteur : ${item.author}`);
   if (item.publisher) lines.push(`Éditeur : ${item.publisher}`);
+  lines.push(`État : ${item.condition || DEFAULT_CONDITION}`);
   lines.push(item.priceStatus === 'found'
     ? `Prix indicatif (eBay) : ${item.ebayPrice} €`
     : 'Prix indicatif (eBay) : non trouvé');
@@ -451,6 +493,24 @@ async function copyFiche(item) {
   } catch {
     showToast("Impossible de copier automatiquement — copiez le texte manuellement.", true);
   }
+}
+
+function makeConditionPicker(item) {
+  const wrap = document.createElement('div');
+  wrap.className = 'condition-picker';
+  for (const c of CONDITIONS) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'condition-chip' + (item.condition === c ? ' selected' : '');
+    chip.textContent = c;
+    chip.addEventListener('click', () => {
+      item.condition = c;
+      saveItems();
+      render();
+    });
+    wrap.appendChild(chip);
+  }
+  return wrap;
 }
 
 function makeCopyBtn(item) {
