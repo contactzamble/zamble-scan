@@ -136,23 +136,18 @@ async function lookupOpenLibrary(isbn) {
   } catch { return null; }
 }
 
+// Passe par le Worker (clé Google Books dédiée) plutôt qu'un appel direct :
+// l'API Google Books appelée sans clé depuis le navigateur partage un quota
+// anonyme mondial qui se retrouve régulièrement à sec (constaté en prod),
+// laissant le code brut affiché comme titre faute de résultat.
 async function lookupGoogleBooks(isbn) {
   try {
-    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`, {
+    const r = await fetch(`${SEARCH_API_URL}/book-lookup?isbn=${encodeURIComponent(isbn)}`, {
       signal: AbortSignal.timeout(5000)
     });
+    if (!r.ok) return null;
     const data = await r.json();
-    if (!data.items || data.items.length === 0) return null;
-    const info = data.items[0].volumeInfo;
-    const cover = (info.imageLinks?.extraLarge || info.imageLinks?.large ||
-                   info.imageLinks?.medium || info.imageLinks?.thumbnail || null)
-      ?.replace('http://', 'https://');
-    return {
-      title: info.title || null,
-      author: (info.authors || []).join(', ') || null,
-      publisher: info.publisher || null,
-      cover: cover || null
-    };
+    return data.title ? data : null;
   } catch { return null; }
 }
 
