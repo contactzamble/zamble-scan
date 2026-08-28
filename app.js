@@ -401,6 +401,7 @@ function render() {
     // Lien direct en premier si le code scanné est une URL (QR code) — la
     // source la plus fiable, avant les recherches génériques par titre.
     if (isUrl(item.code)) links.appendChild(makeLinkBtn('🔗 Page produit', item.code));
+    links.appendChild(makeCopyBtn(item));
     const query = buildSearchQuery(item);
     links.appendChild(makeLinkBtn('Google', buildGoogleUrl(query)));
     links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(query)));
@@ -428,6 +429,37 @@ function render() {
     list.appendChild(li);
   }
   updateBatchButtonsState();
+}
+
+// Fiche prête à coller dans un formulaire Vinted/Leboncoin — pas d'API de
+// publication disponible chez eux, donc on facilite le collage manuel.
+function buildFicheText(item) {
+  const lines = [item.title];
+  if (item.author) lines.push(`Auteur : ${item.author}`);
+  if (item.publisher) lines.push(`Éditeur : ${item.publisher}`);
+  lines.push(item.priceStatus === 'found'
+    ? `Prix indicatif (eBay) : ${item.ebayPrice} €`
+    : 'Prix indicatif (eBay) : non trouvé');
+  return lines.join('\n');
+}
+
+async function copyFiche(item) {
+  const text = buildFicheText(item);
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Fiche copiée — colle-la dans Vinted/Leboncoin 📋');
+  } catch {
+    showToast("Impossible de copier automatiquement — copiez le texte manuellement.", true);
+  }
+}
+
+function makeCopyBtn(item) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'copy-fiche-btn';
+  btn.textContent = '📋 Copier';
+  btn.addEventListener('click', () => copyFiche(item));
+  return btn;
 }
 
 function makeLinkBtn(label, url) {

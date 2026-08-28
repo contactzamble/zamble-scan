@@ -47,6 +47,29 @@ body {
   border-radius: 999px;
 }
 
+.quick-access {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 3.4rem;
+  z-index: 9;
+  overflow-x: auto;
+}
+.quick-access-btn {
+  flex-shrink: 0;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 main { padding: 1rem; max-width: 640px; margin: 0 auto; }
 
 .scan-panel { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
@@ -173,6 +196,16 @@ main { padding: 1rem; max-width: 640px; margin: 0 auto; }
   background: transparent;
   border-style: dashed;
   color: var(--muted);
+}
+.copy-fiche-btn {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 0.4rem;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 1px solid var(--accent);
+  font-weight: 600;
+  cursor: pointer;
 }
 .item-delete {
   background: none;
