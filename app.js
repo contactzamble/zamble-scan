@@ -24,6 +24,7 @@ const FREE_QUOTA_MESSAGE =
 
 let items = loadItems();
 let sequentialQueue = null; // { ids: [...], index: 0 } quand le mode "un par un" est actif
+let adTemplates = loadAdTemplates();
 
 function detectTypeFromCode(code) {
   // Les ISBN (livres) sont des EAN-13 avec le préfixe Bookland 978/979 —
@@ -102,6 +103,25 @@ function saveItems() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   } catch (e) {
     showToast("Impossible d'enregistrer la liste (stockage plein ?).", true);
+  }
+}
+
+const AD_TEMPLATES_STORAGE_KEY = 'zamble-scan-ad-templates';
+
+function loadAdTemplates() {
+  try {
+    const raw = localStorage.getItem(AD_TEMPLATES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAdTemplates() {
+  try {
+    localStorage.setItem(AD_TEMPLATES_STORAGE_KEY, JSON.stringify(adTemplates));
+  } catch {
+    showToast("Impossible d'enregistrer le modèle (stockage plein ?).", true);
   }
 }
 
@@ -574,9 +594,72 @@ function renderAdConditionPicker() {
   }
 }
 
+// Modèles d'annonce enregistrés par l'utilisateur (texte libre, tel quel —
+// pas de placeholder à substituer, cohérent avec le reste de l'appli qui
+// préfère laisser l'utilisateur retoucher le texte à la main plutôt que de
+// tout automatiser). Chargé dans le textarea, il remplace l'annonce
+// auto-générée ; l'utilisateur ajuste ensuite titre/état si besoin avant de
+// copier.
+function renderAdTemplateSelect() {
+  const select = document.getElementById('ad-template-select');
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = adTemplates.length ? 'Charger un modèle enregistré...' : 'Aucun modèle enregistré';
+  select.appendChild(placeholder);
+  for (const tpl of adTemplates) {
+    const opt = document.createElement('option');
+    opt.value = tpl.id;
+    opt.textContent = tpl.name;
+    select.appendChild(opt);
+  }
+}
+
+function saveCurrentAsAdTemplate() {
+  const text = document.getElementById('fiche-textarea').value;
+  if (!text.trim()) return;
+  const name = prompt("Nom de ce modèle d'annonce :");
+  if (!name || !name.trim()) return;
+  const trimmedName = name.trim();
+  const existing = adTemplates.find((t) => t.name.toLowerCase() === trimmedName.toLowerCase());
+  if (existing) {
+    if (!confirm(`Un modèle "${trimmedName}" existe déjà — le remplacer ?`)) return;
+    existing.text = text;
+  } else {
+    adTemplates.push({
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(),
+      name: trimmedName,
+      text
+    });
+  }
+  saveAdTemplates();
+  renderAdTemplateSelect();
+  document.getElementById('ad-template-select').value = existing ? existing.id : adTemplates[adTemplates.length - 1].id;
+  showToast(`Modèle "${trimmedName}" enregistré ✅`);
+}
+
+function applySelectedAdTemplate() {
+  const select = document.getElementById('ad-template-select');
+  const tpl = adTemplates.find((t) => t.id === select.value);
+  if (!tpl) return;
+  document.getElementById('fiche-textarea').value = tpl.text;
+}
+
+function deleteSelectedAdTemplate() {
+  const select = document.getElementById('ad-template-select');
+  const tpl = adTemplates.find((t) => t.id === select.value);
+  if (!tpl) return;
+  if (!confirm(`Supprimer le modèle "${tpl.name}" ?`)) return;
+  adTemplates = adTemplates.filter((t) => t.id !== tpl.id);
+  saveAdTemplates();
+  renderAdTemplateSelect();
+}
+
 function openAdModal(item) {
   currentAdItem = item;
   renderAdConditionPicker();
+  renderAdTemplateSelect();
+  document.getElementById('ad-template-select').value = '';
   document.getElementById('fiche-textarea').value = buildAdText(item, item.condition || DEFAULT_CONDITION);
   document.getElementById('fiche-modal').style.display = 'flex';
 }
@@ -801,6 +884,9 @@ function initUI() {
 
   document.getElementById('fiche-cancel-btn').addEventListener('click', closeFicheModal);
   document.getElementById('fiche-confirm-btn').addEventListener('click', confirmCopyFiche);
+  document.getElementById('fiche-save-template-btn').addEventListener('click', saveCurrentAsAdTemplate);
+  document.getElementById('ad-template-select').addEventListener('change', applySelectedAdTemplate);
+  document.getElementById('ad-template-delete-btn').addEventListener('click', deleteSelectedAdTemplate);
 
   render();
 

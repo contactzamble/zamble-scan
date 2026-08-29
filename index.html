@@ -56,8 +56,15 @@
 <div id="fiche-modal" class="fiche-modal" style="display:none;">
   <div class="fiche-modal-box">
     <p class="fiche-modal-title">Créer une annonce</p>
+    <div class="template-picker">
+      <select id="ad-template-select" class="template-select"></select>
+      <button type="button" id="ad-template-delete-btn" class="template-delete-btn" title="Supprimer ce modèle">🗑</button>
+    </div>
     <div id="ad-condition-picker" class="condition-picker"></div>
     <textarea id="fiche-textarea" class="fiche-textarea" rows="9"></textarea>
+    <div class="fiche-modal-actions">
+      <button type="button" id="fiche-save-template-btn" class="manual-btn">💾 Enregistrer ce modèle d'annonce</button>
+    </div>
     <div class="fiche-modal-actions">
       <button type="button" id="fiche-cancel-btn" class="manual-btn">Annuler</button>
       <button type="button" id="fiche-confirm-btn" class="scan-btn">📋 Copier</button>
