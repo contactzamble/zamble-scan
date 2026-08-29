@@ -245,6 +245,12 @@ async function enrichEbayPrice(item) {
       const cheapest = candidates.reduce((a, b) => (a.price < b.price ? a : b));
       item.priceStatus = 'found';
       item.ebayPrice = cheapest.price;
+      // affiliateUrl (déjà tagué avec le Campaign ID EPN côté Worker) plutôt
+      // que url brute — rémunéré, sans rien à reconfigurer. Sert uniquement à
+      // rendre le badge de prix cliquable vers CETTE annonce précise ; le
+      // bouton "eBay" à côté reste une recherche classique (plus sûre en cas
+      // de mauvais match, voir plus haut).
+      item.ebayUrl = cheapest.affiliateUrl || cheapest.url;
     } else {
       item.priceStatus = 'none';
     }
@@ -381,6 +387,7 @@ function createAndQueueItem({ type, code, title, cover }) {
     cover: cover || null,
     priceStatus: null,
     ebayPrice: null,
+    ebayUrl: null,
     createdAt: Date.now()
   };
   items.unshift(item);
@@ -519,14 +526,27 @@ function render() {
       (item.publisher ? ` · ${item.publisher}` : '') + ` · ${item.code}`;
     body.appendChild(meta);
 
-    const price = document.createElement('div');
+    let price;
     if (item.priceStatus === 'pending') {
+      price = document.createElement('div');
       price.className = 'item-price pending';
       price.textContent = 'Recherche du prix eBay...';
     } else if (item.priceStatus === 'found') {
+      if (item.ebayUrl) {
+        // Badge cliquable vers l'annonce précise trouvée — le bouton "eBay"
+        // à côté reste une recherche classique, plus sûre en cas de mauvais
+        // match (voir buildEbayUrl plus haut).
+        price = document.createElement('a');
+        price.href = item.ebayUrl;
+        price.target = '_blank';
+        price.rel = 'noopener';
+      } else {
+        price = document.createElement('div');
+      }
       price.className = 'item-price found';
       price.textContent = `dès ${item.ebayPrice} € sur eBay`;
     } else {
+      price = document.createElement('div');
       price.className = 'item-price pending';
       price.textContent = 'Prix eBay non trouvé';
     }
