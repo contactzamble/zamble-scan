@@ -28,9 +28,15 @@
 
 <main>
   <section class="scan-panel">
-    <button type="button" id="scan-btn" class="scan-btn">📷 Scanner un code-barre</button>
-    <button type="button" id="qr-scan-btn" class="manual-btn">🔳 Scanner un QR code</button>
-    <button type="button" id="manual-add-btn" class="manual-btn">+ Ajouter sans scanner</button>
+    <button type="button" id="scan-btn" class="scan-btn">
+      <span class="btn-icon icon-barcode" aria-hidden="true"></span> Scanner un code-barre
+    </button>
+    <button type="button" id="qr-scan-btn" class="manual-btn">
+      <span class="btn-icon icon-qrcode" aria-hidden="true"></span> Scanner un QR code
+    </button>
+    <button type="button" id="manual-add-btn" class="manual-btn">
+      <span class="btn-icon icon-plus" aria-hidden="true">+</span> Ajouter sans scanner
+    </button>
   </section>
 
   <div id="scanner-wrap" class="scanner-wrap" style="display:none;">
