@@ -331,6 +331,16 @@ a.item-price.found {
 
 .empty-state { color: var(--muted); text-align: center; margin-top: 2rem; font-size: 0.9rem; }
 
+.affiliate-disclosure {
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
 .fiche-modal {
   position: fixed;
   inset: 0;
@@ -383,6 +393,16 @@ a.item-price.found {
   font-size: 0.9rem;
   font-family: inherit;
   resize: vertical;
+}
+.fiche-input {
+  width: 100%;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  font-size: 1rem;
+  font-family: inherit;
 }
 .fiche-modal-actions {
   display: flex;

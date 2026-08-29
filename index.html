@@ -60,6 +60,8 @@
   <ul id="item-list" class="item-list"></ul>
 
   <p id="empty-state" class="empty-state">Aucun objet scanné pour l'instant — scannez un livre ou un jeu pour commencer.</p>
+
+  <p class="affiliate-disclosure">Zamble Scan contient des liens affiliés (Amazon, eBay) : nous pouvons percevoir une commission sur les achats effectués via ces liens, sans coût supplémentaire pour vous.</p>
 </main>
 
 <div id="fiche-modal" class="fiche-modal" style="display:none;">
@@ -77,6 +79,17 @@
     <div class="fiche-modal-actions">
       <button type="button" id="fiche-cancel-btn" class="manual-btn">Annuler</button>
       <button type="button" id="fiche-confirm-btn" class="scan-btn">📋 Copier</button>
+    </div>
+  </div>
+</div>
+
+<div id="manual-add-modal" class="fiche-modal" style="display:none;">
+  <div class="fiche-modal-box">
+    <p class="fiche-modal-title">Ajouter un objet sans scanner</p>
+    <input type="text" id="manual-add-input" class="fiche-input" placeholder="ex. Vélo enfant Winora, très bon état">
+    <div class="fiche-modal-actions">
+      <button type="button" id="manual-add-cancel-btn" class="manual-btn">Annuler</button>
+      <button type="button" id="manual-add-confirm-btn" class="scan-btn">Ajouter</button>
     </div>
   </div>
 </div>

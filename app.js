@@ -929,10 +929,25 @@ function stopBarcodeScanner() {
 // Ajout manuel (sans scanner)
 // ---------------------------------------------------------------------------
 
-function manualAdd() {
-  const title = prompt('Titre ou description de l\'objet :');
-  if (!title || !title.trim()) return;
-  const item = createAndQueueItem({ type: 'objet', code: '(saisie manuelle)', title: title.trim() });
+// Modal maison plutôt que window.prompt() : le navigateur préfixe toute
+// boîte de dialogue native par "<origine> indique" (sécurité anti-spoofing,
+// non personnalisable par JS) — gênant pour une appli grand public.
+function openManualAddModal() {
+  const input = document.getElementById('manual-add-input');
+  input.value = '';
+  document.getElementById('manual-add-modal').style.display = 'flex';
+  input.focus();
+}
+
+function closeManualAddModal() {
+  document.getElementById('manual-add-modal').style.display = 'none';
+}
+
+function confirmManualAdd() {
+  const title = document.getElementById('manual-add-input').value.trim();
+  if (!title) return;
+  closeManualAddModal();
+  const item = createAndQueueItem({ type: 'objet', code: '(saisie manuelle)', title });
   enrichEbayPrice(item);
 }
 
@@ -944,7 +959,12 @@ function initUI() {
   document.getElementById('scan-btn').addEventListener('click', startBarcodeScanner);
   document.getElementById('qr-scan-btn').addEventListener('click', startQrScanner);
   document.getElementById('scanner-close-btn').addEventListener('click', stopBarcodeScanner);
-  document.getElementById('manual-add-btn').addEventListener('click', manualAdd);
+  document.getElementById('manual-add-btn').addEventListener('click', openManualAddModal);
+  document.getElementById('manual-add-cancel-btn').addEventListener('click', closeManualAddModal);
+  document.getElementById('manual-add-confirm-btn').addEventListener('click', confirmManualAdd);
+  document.getElementById('manual-add-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmManualAdd();
+  });
 
   document.getElementById('select-all').addEventListener('change', (e) => {
     document.querySelectorAll('.item-select').forEach((c) => { c.checked = e.target.checked; });
