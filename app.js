@@ -209,6 +209,20 @@ async function lookupProduct(code) {
 // Enrichissement prix eBay (best-effort, silencieux si échec) via zamble-search-api
 // ---------------------------------------------------------------------------
 
+// Mots indiquant une extension/un accessoire plutôt que le jeu/objet de base
+// — un tri eBay par prix pur les fait remonter avant l'article complet, ce
+// qui rend le "moins cher" trouvé trompeur (constaté en conditions réelles :
+// un "Monster Pack" à 12,46 € passait devant le jeu de base King of Tokyo à
+// 14,99 €, alors que l'utilisateur cherchait bien le jeu complet). Liste
+// courte et non exhaustive, comme SEARCH_NOISE_WORDS — ne couvrira jamais
+// tous les cas, à ajuster si un nouveau cas réel le montre insuffisant.
+const EBAY_ACCESSORY_WORDS = ['extension', 'expansion', 'pack', 'accessoire', 'accessory', 'promo', 'goodies'];
+
+function looksLikeAccessory(title) {
+  const normalized = title.toLowerCase();
+  return EBAY_ACCESSORY_WORDS.some((word) => normalized.includes(word));
+}
+
 async function enrichEbayPrice(item) {
   if (!item.title) return;
   item.priceStatus = 'pending';
@@ -223,8 +237,12 @@ async function enrichEbayPrice(item) {
     // sources est mockée (Amazon l'est en permanence) — on se fie plutôt au
     // flag par annonce, qui distingue vraiment les résultats eBay réels.
     const ebayResults = (data.results || []).filter((x) => x.source === 'ebay' && !x.mock);
-    if (ebayResults.length > 0) {
-      const cheapest = ebayResults.reduce((a, b) => (a.price < b.price ? a : b));
+    // On écarte les extensions/accessoires du choix du "moins cher" — sauf si
+    // TOUS les résultats en ont l'air (mieux vaut un prix imparfait qu'aucun).
+    const genuineResults = ebayResults.filter((x) => !looksLikeAccessory(x.title));
+    const candidates = genuineResults.length > 0 ? genuineResults : ebayResults;
+    if (candidates.length > 0) {
+      const cheapest = candidates.reduce((a, b) => (a.price < b.price ? a : b));
       item.priceStatus = 'found';
       item.ebayPrice = cheapest.price;
     } else {
