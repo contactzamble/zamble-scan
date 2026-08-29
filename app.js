@@ -351,8 +351,8 @@ function buildEbayUrl(query) {
 // précisément l'objet : Google fait le travail à partir du code brut ou du
 // titre déjà connu.
 const SEARCH_FILTERS = [
-  { label: 'Neuf', suffix: 'prix neuf' },
-  { label: 'Occasion', suffix: 'prix occasion' },
+  { label: 'Prix neuf', suffix: 'prix neuf' },
+  { label: 'Prix occasion', suffix: 'prix occasion' },
   { label: 'Avis', suffix: 'avis test' },
   { label: 'Comparatif', suffix: 'comparatif' },
   { label: 'Notice', suffix: 'notice manuel pdf' }

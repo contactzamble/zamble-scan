@@ -223,22 +223,12 @@ a.item-price.found {
   text-decoration: none;
   border: 1px solid var(--border);
 }
-.item-filter-links {
-  /* Tient sur une seule ligne à partir d'environ 375px de large ; en dessous
-     (vieux téléphones étroits), défilement horizontal en filet de sécurité
-     plutôt qu'un retour à deux lignes — même pattern que `.quick-access`. */
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  gap: 0.25rem;
-}
 .item-filter-links a {
   background: transparent;
   border-style: dashed;
   color: var(--muted);
-  flex-shrink: 0;
-  font-size: 0.68rem;
-  padding: 0.2rem 0.3rem;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
 }
 
 /* Bouton "Créer une annonce" isolé sur sa propre ligne pleine largeur — plus
