@@ -59,16 +59,21 @@ body {
   overflow-x: auto;
 }
 .quick-access-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   flex-shrink: 0;
-  padding: 0.4rem 0.9rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--text);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   font-weight: 600;
 }
+.quick-icon { width: 1.3rem; height: 1.3rem; flex-shrink: 0; }
 
 main { padding: 1rem; max-width: 640px; margin: 0 auto; }
 
@@ -208,7 +213,7 @@ a.item-price.found {
   font-weight: 600;
 }
 
-.item-links { display: flex; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
+.item-links { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
 .item-links a {
   font-size: 0.78rem;
   padding: 0.25rem 0.55rem;
@@ -223,6 +228,41 @@ a.item-price.found {
   border-style: dashed;
   color: var(--muted);
 }
+
+/* Boutons de marque (Google/Amazon/Vinted/Etsy/eBay) : icône officielle +
+   cible tactile agrandie (~44px) — demandé explicitement pour un usage avec
+   de gros doigts, plutôt que le petit libellé texte de `.item-links a`. */
+.brand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.95rem;
+  border-radius: 0.6rem;
+  background: var(--panel-2);
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.brand-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+.icon-google { -webkit-mask-image: url(icons/brands/google.svg); mask-image: url(icons/brands/google.svg); color: #8ab4f8; }
+.icon-amazon { -webkit-mask-image: url(icons/brands/amazon.svg); mask-image: url(icons/brands/amazon.svg); color: #ff9900; }
+.icon-vinted { -webkit-mask-image: url(icons/brands/vinted.svg); mask-image: url(icons/brands/vinted.svg); color: #09b1ba; }
+.icon-etsy { -webkit-mask-image: url(icons/brands/etsy.svg); mask-image: url(icons/brands/etsy.svg); color: #f1641e; }
+.icon-ebay { -webkit-mask-image: url(icons/brands/ebay.svg); mask-image: url(icons/brands/ebay.svg); color: #e53238; }
 .copy-fiche-btn {
   font-size: 0.78rem;
   padding: 0.25rem 0.55rem;

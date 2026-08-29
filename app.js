@@ -560,11 +560,11 @@ function render() {
     if (isUrl(item.code)) links.appendChild(makeLinkBtn('🔗 Page produit', item.code));
     links.appendChild(makeCopyBtn(item));
     const query = buildSearchQuery(item);
-    links.appendChild(makeLinkBtn('Google', buildGoogleUrl(query)));
-    links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(buildStrictSearchQuery(item))));
-    links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(buildStrictSearchQuery(item))));
-    links.appendChild(makeLinkBtn('Etsy', buildEtsyUrl(query)));
-    links.appendChild(makeLinkBtn('eBay', buildEbayUrl(buildStrictSearchQuery(item))));
+    links.appendChild(makeBrandLinkBtn('google', 'Google', buildGoogleUrl(query)));
+    links.appendChild(makeBrandLinkBtn('amazon', 'Amazon', buildAmazonUrl(buildStrictSearchQuery(item))));
+    links.appendChild(makeBrandLinkBtn('vinted', 'Vinted', buildVintedUrl(buildStrictSearchQuery(item))));
+    links.appendChild(makeBrandLinkBtn('etsy', 'Etsy', buildEtsyUrl(query)));
+    links.appendChild(makeBrandLinkBtn('ebay', 'eBay', buildEbayUrl(buildStrictSearchQuery(item))));
     body.appendChild(links);
 
     const filterLinks = document.createElement('div');
@@ -744,6 +744,23 @@ function makeLinkBtn(label, url) {
   a.target = '_blank';
   a.rel = 'noopener';
   a.textContent = label;
+  return a;
+}
+
+// Bouton avec icône de marque officielle (Simple Icons, colorée en CSS via
+// mask sur `.icon-<brand>`) au lieu d'un simple libellé texte — plus gros
+// (voir .brand-btn dans style.css) pour rester tapable facilement.
+function makeBrandLinkBtn(brand, label, url) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.className = 'brand-btn';
+  const icon = document.createElement('span');
+  icon.className = `brand-icon icon-${brand}`;
+  icon.setAttribute('aria-hidden', 'true');
+  a.appendChild(icon);
+  a.appendChild(document.createTextNode(label));
   return a;
 }
 
