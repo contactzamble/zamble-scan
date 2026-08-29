@@ -227,9 +227,6 @@ async function enrichEbayPrice(item) {
       const cheapest = ebayResults.reduce((a, b) => (a.price < b.price ? a : b));
       item.priceStatus = 'found';
       item.ebayPrice = cheapest.price;
-      // affiliateUrl (déjà tagué avec le Campaign ID EPN côté Worker) plutôt
-      // que url brute — rémunéré, sans rien à reconfigurer.
-      item.ebayUrl = cheapest.affiliateUrl || cheapest.url;
     } else {
       item.priceStatus = 'none';
     }
@@ -252,6 +249,14 @@ window.addEventListener('online', retryPendingEnrichment);
 function buildGoogleUrl(query) {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
+// Campaign ID EPN déjà approuvé (voir zamble-comparatifs) — même principe que
+// le tag Amazon juste en dessous, appliqué directement sur l'URL de
+// recherche plutôt que sur une annonce précise (voir buildEbayUrl : le badge
+// de prix reste informatif, mais le lien cliquable est désormais une
+// recherche comme les autres, pas l'annonce trouvée — demandé par
+// l'utilisateur après un risque de mauvais match constaté).
+const EBAY_CAMPAIGN_ID = '5339192002';
+
 function buildAmazonUrl(query) {
   // Tag affilié valable aussi sur une recherche (pas besoin d'un ASIN précis) —
   // rémunéré si un achat suit dans la fenêtre de cookie Amazon.
@@ -309,6 +314,15 @@ function buildEtsyUrl(query) {
   // Recherche simple, sans tag d'affiliation (pas de compte Etsy/Awin configuré).
   return `https://www.etsy.com/fr/search?q=${encodeURIComponent(query)}`;
 }
+function buildEbayUrl(query) {
+  const url = new URL('https://www.ebay.fr/sch/i.html');
+  url.searchParams.set('_nkw', query);
+  url.searchParams.set('mkevt', '1');
+  url.searchParams.set('mkcid', '1');
+  url.searchParams.set('siteid', '71');
+  url.searchParams.set('campid', EBAY_CAMPAIGN_ID);
+  return url.toString();
+}
 
 // Recherches Google orientées par mot-clé — évite d'avoir besoin d'identifier
 // précisément l'objet : Google fait le travail à partir du code brut ou du
@@ -351,7 +365,6 @@ function createAndQueueItem({ type, code, title, cover }) {
     cover: cover || null,
     priceStatus: null,
     ebayPrice: null,
-    ebayUrl: null,
     createdAt: Date.now()
   };
   items.unshift(item);
@@ -514,7 +527,7 @@ function render() {
     links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(query)));
     links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(buildVintedQuery(item))));
     links.appendChild(makeLinkBtn('Etsy', buildEtsyUrl(query)));
-    if (item.ebayUrl) links.appendChild(makeLinkBtn('eBay', item.ebayUrl));
+    links.appendChild(makeLinkBtn('eBay', buildEbayUrl(buildEbaySearchQuery(item))));
     body.appendChild(links);
 
     const filterLinks = document.createElement('div');
