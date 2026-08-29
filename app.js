@@ -194,7 +194,7 @@ async function enrichEbayPrice(item) {
   item.priceStatus = 'pending';
   render();
   try {
-    const r = await fetch(`${SEARCH_API_URL}/search?q=${encodeURIComponent(item.title)}`, {
+    const r = await fetch(`${SEARCH_API_URL}/search?q=${encodeURIComponent(buildEbaySearchQuery(item))}`, {
       signal: AbortSignal.timeout(6000)
     });
     if (!r.ok) throw new Error('bad status');
@@ -239,6 +239,51 @@ function buildAmazonUrl(query) {
 }
 function buildVintedUrl(query) {
   return `https://www.vinted.fr/catalog?search_text=${encodeURIComponent(query)}`;
+}
+
+// Mots trop rares/spécifiques au catalogue pour aider la recherche (mention de
+// langue, "version") — testé en conditions réelles sur l'API eBay : chaque mot
+// pris seul ne gêne pas beaucoup, mais leur combinaison ("French version")
+// fait tomber le nombre de résultats à zéro alors que la requête sans eux en
+// retrouve 4. Comparaison insensible aux accents/majuscules.
+const SEARCH_NOISE_WORDS = new Set([
+  'version', 'french', 'francais', 'francaise', 'anglais', 'anglaise', 'english',
+  'allemand', 'allemande', 'german', 'italien', 'italienne', 'italian',
+  'espagnol', 'espagnole', 'spanish', 'neerlandais', 'portugais', 'portugaise',
+  'portuguese', 'multilingue', 'multilingual'
+]);
+
+function stripNoiseWords(text) {
+  return text
+    .split(/\s+/)
+    .filter((tok) => {
+      const normalized = tok.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+      return !SEARCH_NOISE_WORDS.has(normalized);
+    })
+    .join(' ')
+    .trim();
+}
+
+// Requête pour la recherche de prix eBay (auto, en tâche de fond) : le titre
+// brut, débarrassé des mots de langue/version qui cassent le matching côté
+// eBay (voir SEARCH_NOISE_WORDS) — les numéros de référence sont gardés, ils
+// ne posent pas de problème constaté et peuvent être l'info clé pour d'autres
+// objets (ex. un numéro de set LEGO).
+function buildEbaySearchQuery(item) {
+  return stripNoiseWords(item.title) || item.title;
+}
+
+// Requête stricte pour Vinted : uniquement le titre du jeu/objet + l'éditeur,
+// sans numéro de référence catalogue ni mention de langue/version — demandé
+// explicitement, la requête complète (comme pour Google/Amazon) n'y retrouve
+// rien. Réservé aux objets génériques : un livre peut légitimement avoir un
+// nombre dans son titre ("1984", "80 jours"), on ne veut pas y toucher.
+function buildVintedQuery(item) {
+  if (item.type === 'livre') return buildSearchQuery(item);
+  const parts = [item.title];
+  if (item.publisher) parts.push(item.publisher);
+  const withoutNumbers = parts.join(' ').split(/\s+/).filter((tok) => !/^\d+$/.test(tok)).join(' ');
+  return stripNoiseWords(withoutNumbers) || buildSearchQuery(item);
 }
 function buildEtsyUrl(query) {
   // Recherche simple, sans tag d'affiliation (pas de compte Etsy/Awin configuré).
@@ -447,7 +492,7 @@ function render() {
     const query = buildSearchQuery(item);
     links.appendChild(makeLinkBtn('Google', buildGoogleUrl(query)));
     links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(query)));
-    links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(query)));
+    links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(buildVintedQuery(item))));
     links.appendChild(makeLinkBtn('Etsy', buildEtsyUrl(query)));
     if (item.ebayUrl) links.appendChild(makeLinkBtn('eBay', item.ebayUrl));
     body.appendChild(links);
