@@ -214,7 +214,7 @@ async function enrichEbayPrice(item) {
   item.priceStatus = 'pending';
   render();
   try {
-    const r = await fetch(`${SEARCH_API_URL}/search?q=${encodeURIComponent(buildEbaySearchQuery(item))}`, {
+    const r = await fetch(`${SEARCH_API_URL}/search?q=${encodeURIComponent(buildStrictSearchQuery(item))}`, {
       signal: AbortSignal.timeout(6000)
     });
     if (!r.ok) throw new Error('bad status');
@@ -289,21 +289,19 @@ function stripNoiseWords(text) {
     .trim();
 }
 
-// Requête pour la recherche de prix eBay (auto, en tâche de fond) : le titre
-// brut, débarrassé des mots de langue/version qui cassent le matching côté
-// eBay (voir SEARCH_NOISE_WORDS) — les numéros de référence sont gardés, ils
-// ne posent pas de problème constaté et peuvent être l'info clé pour d'autres
-// objets (ex. un numéro de set LEGO).
-function buildEbaySearchQuery(item) {
-  return stripNoiseWords(item.title) || item.title;
-}
-
-// Requête stricte pour Vinted : uniquement le titre du jeu/objet + l'éditeur,
-// sans numéro de référence catalogue ni mention de langue/version — demandé
-// explicitement, la requête complète (comme pour Google/Amazon) n'y retrouve
-// rien. Réservé aux objets génériques : un livre peut légitimement avoir un
-// nombre dans son titre ("1984", "80 jours"), on ne veut pas y toucher.
-function buildVintedQuery(item) {
+// Requête stricte pour Vinted ET eBay : uniquement le titre du jeu/objet +
+// l'éditeur, sans numéro de référence catalogue ni mention de langue/version.
+// Utilisée d'abord pour Vinted (demandé explicitement, la requête complète
+// n'y retrouvait rien), puis étendue à eBay après un cas réel similaire
+// constaté : un numéro de référence catalogue isolé (ex. "51315") peut à lui
+// seul faire disparaître une annonce bien réelle des résultats eBay — un test
+// en direct sur l'API a montré qu'une annonce à 20 € trouvée manuellement par
+// l'utilisateur (« Jeux de société - King of Tokyo ») n'apparaissait qu'une
+// fois ce numéro retiré de la requête. Réservé aux objets génériques : un
+// livre peut légitimement avoir un nombre dans son titre ("1984", "80
+// jours"), on ne veut pas y toucher (garde `buildSearchQuery`, la requête
+// complète, pour Google/Amazon/Etsy et les livres).
+function buildStrictSearchQuery(item) {
   if (item.type === 'livre') return buildSearchQuery(item);
   const parts = [item.title];
   if (item.publisher) parts.push(item.publisher);
@@ -525,9 +523,9 @@ function render() {
     const query = buildSearchQuery(item);
     links.appendChild(makeLinkBtn('Google', buildGoogleUrl(query)));
     links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(query)));
-    links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(buildVintedQuery(item))));
+    links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(buildStrictSearchQuery(item))));
     links.appendChild(makeLinkBtn('Etsy', buildEtsyUrl(query)));
-    links.appendChild(makeLinkBtn('eBay', buildEbayUrl(buildEbaySearchQuery(item))));
+    links.appendChild(makeLinkBtn('eBay', buildEbayUrl(buildStrictSearchQuery(item))));
     body.appendChild(links);
 
     const filterLinks = document.createElement('div');
