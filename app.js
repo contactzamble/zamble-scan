@@ -313,18 +313,19 @@ function stripNoiseWords(text) {
     .trim();
 }
 
-// Requête stricte pour Vinted ET eBay : uniquement le titre du jeu/objet +
-// l'éditeur, sans numéro de référence catalogue ni mention de langue/version.
-// Utilisée d'abord pour Vinted (demandé explicitement, la requête complète
-// n'y retrouvait rien), puis étendue à eBay après un cas réel similaire
-// constaté : un numéro de référence catalogue isolé (ex. "51315") peut à lui
-// seul faire disparaître une annonce bien réelle des résultats eBay — un test
-// en direct sur l'API a montré qu'une annonce à 20 € trouvée manuellement par
-// l'utilisateur (« Jeux de société - King of Tokyo ») n'apparaissait qu'une
-// fois ce numéro retiré de la requête. Réservé aux objets génériques : un
-// livre peut légitimement avoir un nombre dans son titre ("1984", "80
-// jours"), on ne veut pas y toucher (garde `buildSearchQuery`, la requête
-// complète, pour Google/Amazon/Etsy et les livres).
+// Requête stricte pour Vinted, eBay ET Amazon : uniquement le titre du
+// jeu/objet + l'éditeur, sans numéro de référence catalogue ni mention de
+// langue/version. Utilisée d'abord pour Vinted (demandé explicitement, la
+// requête complète n'y retrouvait rien), étendue à eBay puis à Amazon après
+// des cas réels similaires constatés à chaque fois : un numéro de référence
+// catalogue isolé (ex. "51315") peut à lui seul faire disparaître une
+// annonce bien réelle des résultats — un test en direct sur l'API eBay a
+// montré qu'une annonce à 20 € trouvée manuellement par l'utilisateur
+// (« Jeux de société - King of Tokyo ») n'apparaissait qu'une fois ce numéro
+// retiré de la requête, et le même symptôme a été observé sur Amazon.
+// Réservé aux objets génériques : un livre peut légitimement avoir un nombre
+// dans son titre ("1984", "80 jours"), on ne veut pas y toucher (garde
+// `buildSearchQuery`, la requête complète, pour Google/Etsy et les livres).
 function buildStrictSearchQuery(item) {
   if (item.type === 'livre') return buildSearchQuery(item);
   const parts = [item.title];
@@ -560,7 +561,7 @@ function render() {
     links.appendChild(makeCopyBtn(item));
     const query = buildSearchQuery(item);
     links.appendChild(makeLinkBtn('Google', buildGoogleUrl(query)));
-    links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(query)));
+    links.appendChild(makeLinkBtn('Amazon', buildAmazonUrl(buildStrictSearchQuery(item))));
     links.appendChild(makeLinkBtn('Vinted', buildVintedUrl(buildStrictSearchQuery(item))));
     links.appendChild(makeLinkBtn('Etsy', buildEtsyUrl(query)));
     links.appendChild(makeLinkBtn('eBay', buildEbayUrl(buildStrictSearchQuery(item))));

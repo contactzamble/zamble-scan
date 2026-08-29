@@ -182,7 +182,15 @@ main { padding: 1rem; max-width: 640px; margin: 0 auto; }
 .item-price { font-size: 0.82rem; margin-top: 0.3rem; }
 .item-price.pending { color: var(--muted); }
 .item-price.found { color: var(--ok); font-weight: 600; }
-a.item-price { display: inline-block; text-decoration: underline; cursor: pointer; }
+a.item-price.found {
+  display: inline-block;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.4rem;
+  background: var(--panel-2);
+  border: 1px solid var(--ok);
+}
 .condition-picker { display: flex; gap: 0.35rem; margin-top: 0.4rem; flex-wrap: wrap; }
 .condition-chip {
   font-size: 0.75rem;
