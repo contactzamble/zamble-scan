@@ -351,8 +351,8 @@ function buildEbayUrl(query) {
 // précisément l'objet : Google fait le travail à partir du code brut ou du
 // titre déjà connu.
 const SEARCH_FILTERS = [
-  { label: 'Prix neuf', suffix: 'prix neuf' },
-  { label: 'Prix occasion', suffix: 'prix occasion' },
+  { label: 'Neuf', suffix: 'prix neuf' },
+  { label: 'Occasion', suffix: 'prix occasion' },
   { label: 'Avis', suffix: 'avis test' },
   { label: 'Comparatif', suffix: 'comparatif' },
   { label: 'Notice', suffix: 'notice manuel pdf' }
@@ -553,12 +553,16 @@ function render() {
     }
     body.appendChild(price);
 
+    const actions = document.createElement('div');
+    actions.className = 'item-actions';
+    actions.appendChild(makeCopyBtn(item));
+    body.appendChild(actions);
+
     const links = document.createElement('div');
-    links.className = 'item-links';
+    links.className = 'item-links brand-grid';
     // Lien direct en premier si le code scanné est une URL (QR code) — la
     // source la plus fiable, avant les recherches génériques par titre.
     if (isUrl(item.code)) links.appendChild(makeLinkBtn('🔗 Page produit', item.code));
-    links.appendChild(makeCopyBtn(item));
     const query = buildSearchQuery(item);
     links.appendChild(makeBrandLinkBtn('google', 'Google', buildGoogleUrl(query)));
     links.appendChild(makeBrandLinkBtn('amazon', 'Amazon', buildAmazonUrl(buildStrictSearchQuery(item))));

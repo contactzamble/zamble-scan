@@ -223,32 +223,65 @@ a.item-price.found {
   text-decoration: none;
   border: 1px solid var(--border);
 }
+.item-filter-links {
+  /* Tient sur une seule ligne à partir d'environ 375px de large ; en dessous
+     (vieux téléphones étroits), défilement horizontal en filet de sécurité
+     plutôt qu'un retour à deux lignes — même pattern que `.quick-access`. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  gap: 0.25rem;
+}
 .item-filter-links a {
   background: transparent;
   border-style: dashed;
   color: var(--muted);
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  padding: 0.2rem 0.3rem;
 }
 
-/* Boutons de marque (Google/Amazon/Vinted/Etsy/eBay) : icône officielle +
-   cible tactile agrandie (~44px) — demandé explicitement pour un usage avec
-   de gros doigts, plutôt que le petit libellé texte de `.item-links a`. */
+/* Bouton "Créer une annonce" isolé sur sa propre ligne pleine largeur — plus
+   il n'est plus mélangé à la grille des icônes de marque ci-dessous (voir
+   .brand-grid), qui doit garder un nombre fixe de colonnes. */
+.item-actions { margin-top: 0.5rem; }
+.item-actions .copy-fiche-btn {
+  display: block;
+  width: 100%;
+  min-height: 2.6rem;
+  font-size: 0.85rem;
+}
+
+/* Boutons de marque (Google/Amazon/Vinted/Etsy/eBay) : icône officielle
+   plutôt que le petit libellé texte de `.item-links a`. Grille à 3 colonnes
+   fixes (plutôt qu'un simple flex-wrap) pour garantir 2 lignes sur un
+   téléphone de taille classique, quelle que soit la largeur exacte de
+   l'écran — demandé explicitement après un premier essai à 3 lignes. */
+.brand-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
 .brand-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.45rem;
-  min-height: 2.75rem;
-  padding: 0.6rem 0.95rem;
-  border-radius: 0.6rem;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.4rem;
+  padding: 0.4rem 0.3rem;
+  border-radius: 0.5rem;
   background: var(--panel-2);
   color: var(--text);
   text-decoration: none;
   border: 1px solid var(--border);
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .brand-icon {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.1rem;
+  height: 1.1rem;
   flex-shrink: 0;
   background-color: currentColor;
   -webkit-mask-repeat: no-repeat;
