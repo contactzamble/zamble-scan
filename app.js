@@ -559,7 +559,7 @@ function render() {
     body.appendChild(actions);
 
     const links = document.createElement('div');
-    links.className = 'item-links brand-grid';
+    links.className = 'item-links';
     // Lien direct en premier si le code scanné est une URL (QR code) — la
     // source la plus fiable, avant les recherches génériques par titre.
     if (isUrl(item.code)) links.appendChild(makeLinkBtn('🔗 Page produit', item.code));
